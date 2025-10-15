@@ -13,7 +13,6 @@ const rfs = require('rotating-file-stream');
 const winston = require('winston');
 const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
-const express = require('express');
 
 // Import models
 const User = require('./models/User');
