@@ -1,5 +1,5 @@
 const { DataTypes } = require('sequelize');
-const sequelize = require('../config/database');
+const { sequelize } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
@@ -8,13 +8,15 @@ const User = sequelize.define('User', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
+    primaryKey: true,
+    allowNull: false
   },
   name: {
     type: DataTypes.STRING,
     allowNull: false,
     validate: {
-      len: [1, 50]
+      notEmpty: true,
+      len: [2, 100]
     }
   },
   email: {
@@ -22,12 +24,17 @@ const User = sequelize.define('User', {
     allowNull: false,
     unique: true,
     validate: {
-      isEmail: true
+      isEmail: true,
+      notEmpty: true
     }
   },
   password: {
     type: DataTypes.STRING,
-    allowNull: false
+    allowNull: false,
+    validate: {
+      notEmpty: true,
+      len: [6, 100]
+    }
   },
   role: {
     type: DataTypes.ENUM('user', 'admin'),
@@ -37,23 +44,45 @@ const User = sequelize.define('User', {
     type: DataTypes.BOOLEAN,
     defaultValue: false
   },
-  resetPasswordToken: DataTypes.STRING,
-  resetPasswordExpire: DataTypes.DATE,
-  verifyEmailToken: DataTypes.STRING,
-  verifyEmailExpire: DataTypes.DATE,
-  otp: DataTypes.STRING,
-  otpExpire: DataTypes.DATE,
+  resetPasswordToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  resetPasswordExpire: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  verifyEmailToken: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  verifyEmailExpire: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  otp: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  otpExpire: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   otpAttempts: {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
-  lastOtpSent: DataTypes.DATE,
+  lastOtpSent: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   profileImage: {
     type: DataTypes.STRING,
     defaultValue: ''
   },
   phoneNumber: {
     type: DataTypes.STRING,
+    allowNull: true,
     validate: {
       is: /^[0-9]{10}$/
     }
@@ -64,57 +93,34 @@ const User = sequelize.define('User', {
   }
 }, {
   timestamps: true,
-  tableName: 'users'
-});
-
-// Address model (separate table for one-to-many relationship)
-const Address = sequelize.define('Address', {
-  id: {
-    type: DataTypes.UUID,
-    defaultValue: DataTypes.UUIDV4,
-    primaryKey: true
-  },
-  type: {
-    type: DataTypes.ENUM('home', 'work', 'other'),
-    defaultValue: 'home'
-  },
-  street: DataTypes.STRING,
-  city: DataTypes.STRING,
-  state: DataTypes.STRING,
-  pincode: DataTypes.STRING,
-  country: {
-    type: DataTypes.STRING,
-    defaultValue: 'India'
-  },
-  isDefault: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: false
+  tableName: 'users',
+  hooks: {
+    beforeCreate: async (user) => {
+      if (user.password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    },
+    beforeUpdate: async (user) => {
+      if (user.changed('password')) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    }
   }
 });
 
-// Wishlist model (junction table for many-to-many relationship)
-const Wishlist = sequelize.define('Wishlist', {
-  addedAt: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
-  }
-});
-
-// Define associations
-User.hasMany(Address);
-Address.belongsTo(User);
-
-User.belongsToMany(require('./Product'), { through: Wishlist });
-
-// Instance methods
+// Instance Methods
 User.prototype.comparePassword = async function(enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
 User.prototype.getJwtToken = function() {
-  return jwt.sign({ id: this.id }, process.env.JWT_SECRET, {
-    expiresIn: process.env.JWT_EXPIRES_IN,
-  });
+  return jwt.sign(
+    { id: this.id, role: this.role },
+    process.env.JWT_SECRET,
+    { expiresIn: process.env.JWT_EXPIRES_IN || '7d' }
+  );
 };
 
 User.prototype.getResetPasswordToken = function() {
@@ -123,7 +129,7 @@ User.prototype.getResetPasswordToken = function() {
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
-  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
+  this.resetPasswordExpire = new Date(Date.now() + 30 * 60 * 1000);
   return resetToken;
 };
 
@@ -133,16 +139,16 @@ User.prototype.getVerifyEmailToken = function() {
     .createHash('sha256')
     .update(verifyToken)
     .digest('hex');
-  this.verifyEmailExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  this.verifyEmailExpire = new Date(Date.now() + 24 * 60 * 60 * 1000);
   return verifyToken;
 };
 
 User.prototype.generateOtp = function() {
   const otp = Math.floor(100000 + Math.random() * 900000).toString();
   this.otp = otp;
-  this.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.otpExpire = new Date(Date.now() + 10 * 60 * 1000);
   this.otpAttempts = 0;
-  this.lastOtpSent = Date.now();
+  this.lastOtpSent = new Date();
   return otp;
 };
 
@@ -151,34 +157,33 @@ User.prototype.isPasswordResetTokenValid = function(token) {
     .createHash('sha256')
     .update(token)
     .digest('hex');
-
-  return hashedToken === this.resetPasswordToken && this.resetPasswordExpire > Date.now();
+  return hashedToken === this.resetPasswordToken && 
+         this.resetPasswordExpire > new Date();
 };
 
-// Check if email verification token is valid
-userSchema.methods.isEmailVerificationTokenValid = function(token) {
+User.prototype.isEmailVerificationTokenValid = function(token) {
+  if (!this.verifyEmailToken || !this.verifyEmailExpire) return false;
+  
   const hashedToken = crypto
     .createHash('sha256')
     .update(token)
     .digest('hex');
-
-  return hashedToken === this.emailVerificationToken && this.emailVerificationExpires > Date.now();
+  return hashedToken === this.verifyEmailToken && 
+         this.verifyEmailExpire > new Date();
 };
 
-// Check if mobile OTP is valid
-userSchema.methods.isMobileOTPValid = function(otp) {
-  const hashedOtp = crypto
-    .createHash('sha256')
-    .update(otp)
-    .digest('hex');
-
-  return hashedOtp === this.mobileVerificationCode && this.mobileVerificationExpires > Date.now();
+User.prototype.isOtpValid = function(otp) {
+  if (!this.otp || !this.otpExpire) return false;
+  
+  return this.otp === otp && 
+         this.otpExpire > new Date() && 
+         this.otpAttempts < 5;
 };
 
-// Increment OTP attempts
-userSchema.methods.incrementOtpAttempts = function() {
+User.prototype.incrementOtpAttempts = async function() {
   this.otpAttempts += 1;
-  return this.save();
+  return await this.save();
 };
 
-module.exports = mongoose.model('User', userSchema);
+// Export the model
+module.exports = User;
