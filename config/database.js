@@ -1,39 +1,47 @@
-require('dotenv').config();
 const { Sequelize } = require('sequelize');
+const config = require('./config.json')[process.env.NODE_ENV || 'development'];
 
-// Get database URL from environment variables
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  console.error('DATABASE_URL is not defined in environment variables');
-  process.exit(1);
-}
-
-// Create a new Sequelize instance
-const sequelize = new Sequelize(databaseUrl, {
-  dialect: 'postgres',
-  protocol: 'postgres',
-  dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
+// Initialize Sequelize with configuration
+const sequelize = new Sequelize(
+  config.database,
+  config.username,
+  config.password,
+  {
+    host: config.host,
+    dialect: 'postgres',
+    port: config.port,
+    logging: config.logging,
+    dialectOptions: config.dialectOptions,
+    pool: config.pool || {
+      max: 5,
+      min: 0,
+      acquire: 30000,
+      idle: 10000
     }
-  },
-  logging: process.env.NODE_ENV === 'development' ? console.log : false
-});
+  }
+);
 
-// Test the database connection
+// Test database connection
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
     console.log('✅ Database connection has been established successfully.');
+    return true;
   } catch (error) {
-    console.error('❌ Unable to connect to the database:', error);
-    process.exit(1);
+    console.error('❌ Unable to connect to the database:', error.message);
+    return false;
   }
 };
 
+// Test connection on startup
+if (process.env.NODE_ENV !== 'test') {
+  testConnection().then(success => {
+    if (!success) process.exit(1);
+  });
+}
+
 module.exports = {
   sequelize,
+  Sequelize,
   testConnection
 };
