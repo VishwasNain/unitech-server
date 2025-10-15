@@ -1,4 +1,6 @@
-require('dotenv').config();
+if (process.env.NODE_ENV !== 'production') {
+  require('dotenv').config();
+}
 const express = require('express');
 const cors = require('cors');
 const helmet = require('helmet');
@@ -15,7 +17,7 @@ const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
 // Import models
-const User = require('./models/User');
+const { User, Address, Wishlist } = require('./models/User');
 const Product = require('./models/Product');
 const Order = require('./models/Order');
 const OrderItem = require('./models/OrderItem');

@@ -1,25 +1,21 @@
 {
   "development": {
-    "use_env_variable": "DATABASE_URL",
+    "username": "postgres",
+    "password": "postgres",
+    "database": "unitech_dev",
+    "host": "localhost",
     "dialect": "postgres",
-    "protocol": "postgres",
-    "dialectOptions": {
-      "ssl": {
-        "require": true,
-        "rejectUnauthorized": false
-      }
-    }
-  },
-  "test": {
-    "use_env_variable": "TEST_DATABASE_URL",
-    "dialect": "postgres",
-    "protocol": "postgres",
+    "port": 5432,
     "logging": false
   },
   "production": {
-    "use_env_variable": "DATABASE_URL",
+    "username": "neondb_owner",
+    "password": "npg_2gsTXGwScl8W",
+    "database": "neondb",
+    "host": "ep-dawn-brook-a1fi5x6y-pooler.ap-southeast-1.aws.neon.tech",
     "dialect": "postgres",
-    "protocol": "postgres",
+    "port": 5432,
+    "logging": false,
     "dialectOptions": {
       "ssl": {
         "require": true,

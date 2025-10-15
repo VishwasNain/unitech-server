@@ -2,3 +2,8 @@
 .env.*
 *.pem
 *.key
+node_modules/
+.env
+.DS_Store
+logs/
+*.log

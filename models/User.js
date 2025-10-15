@@ -1,158 +1,158 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const sequelize = require('../config/database');
 const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   name: {
-    type: String,
-    required: [true, 'Name is required'],
-    trim: true,
-    maxlength: [50, 'Name cannot be more than 50 characters']
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      len: [1, 50]
+    }
   },
   email: {
-    type: String,
-    required: [true, 'Email is required'],
+    type: DataTypes.STRING,
+    allowNull: false,
     unique: true,
-    lowercase: true,
-    match: [
-      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-      'Please provide a valid email'
-    ]
-  },
-  mobile: {
-    type: String,
-    required: [true, 'Mobile number is required'],
-    unique: true,
-    match: [/^[6-9]\d{9}$/, 'Please provide a valid 10-digit mobile number']
+    validate: {
+      isEmail: true
+    }
   },
   password: {
-    type: String,
-    required: [true, 'Password is required'],
-    minlength: [6, 'Password must be at least 6 characters'],
-    select: false // Don't include password in queries by default
+    type: DataTypes.STRING,
+    allowNull: false
   },
   role: {
-    type: String,
-    enum: ['user', 'admin'],
-    default: 'user'
+    type: DataTypes.ENUM('user', 'admin'),
+    defaultValue: 'user'
   },
   isVerified: {
-    type: Boolean,
-    default: false
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
-  emailVerificationToken: String,
-  emailVerificationExpires: Date,
-  passwordResetToken: String,
-  passwordResetExpires: Date,
-  mobileVerificationCode: String,
-  mobileVerificationExpires: Date,
+  resetPasswordToken: DataTypes.STRING,
+  resetPasswordExpire: DataTypes.DATE,
+  verifyEmailToken: DataTypes.STRING,
+  verifyEmailExpire: DataTypes.DATE,
+  otp: DataTypes.STRING,
+  otpExpire: DataTypes.DATE,
   otpAttempts: {
-    type: Number,
-    default: 0
+    type: DataTypes.INTEGER,
+    defaultValue: 0
   },
-  lastOtpSent: Date,
+  lastOtpSent: DataTypes.DATE,
   profileImage: {
-    type: String,
-    default: ''
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
-  addresses: [{
-    type: {
-      type: String,
-      enum: ['home', 'work', 'other'],
-      default: 'home'
-    },
-    street: String,
-    city: String,
-    state: String,
-    pincode: String,
-    isDefault: {
-      type: Boolean,
-      default: false
+  phoneNumber: {
+    type: DataTypes.STRING,
+    validate: {
+      is: /^[0-9]{10}$/
     }
-  }],
-  wishlist: [{
-    product: {
-      type: mongoose.Schema.ObjectId,
-      ref: 'Product'
-    },
-    addedAt: {
-      type: Date,
-      default: Date.now
-    }
-  }]
+  },
+  isActive: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
+  }
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
+  tableName: 'users'
 });
 
-// Index for better query performance
-userSchema.index({ email: 1 });
-userSchema.index({ mobile: 1 });
-
-// Hash password before saving
-userSchema.pre('save', async function(next) {
-  if (!this.isModified('password')) return next();
-
-  const salt = await bcrypt.genSalt(12);
-  this.password = await bcrypt.hash(this.password, salt);
-  next();
+// Address model (separate table for one-to-many relationship)
+const Address = sequelize.define('Address', {
+  id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  type: {
+    type: DataTypes.ENUM('home', 'work', 'other'),
+    defaultValue: 'home'
+  },
+  street: DataTypes.STRING,
+  city: DataTypes.STRING,
+  state: DataTypes.STRING,
+  pincode: DataTypes.STRING,
+  country: {
+    type: DataTypes.STRING,
+    defaultValue: 'India'
+  },
+  isDefault: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  }
 });
 
-// Generate email verification token
-userSchema.methods.createEmailVerificationToken = function() {
-  const verificationToken = crypto.randomBytes(32).toString('hex');
+// Wishlist model (junction table for many-to-many relationship)
+const Wishlist = sequelize.define('Wishlist', {
+  addedAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+});
 
-  this.emailVerificationToken = crypto
-    .createHash('sha256')
-    .update(verificationToken)
-    .digest('hex');
+// Define associations
+User.hasMany(Address);
+Address.belongsTo(User);
 
-  this.emailVerificationExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
+User.belongsToMany(require('./Product'), { through: Wishlist });
 
-  return verificationToken;
+// Instance methods
+User.prototype.comparePassword = async function(enteredPassword) {
+  return await bcrypt.compare(enteredPassword, this.password);
 };
 
-// Generate password reset token
-userSchema.methods.createPasswordResetToken = function() {
-  const resetToken = crypto.randomBytes(32).toString('hex');
+User.prototype.getJwtToken = function() {
+  return jwt.sign({ id: this.id }, process.env.JWT_SECRET, {
+    expiresIn: process.env.JWT_EXPIRES_IN,
+  });
+};
 
-  this.passwordResetToken = crypto
+User.prototype.getResetPasswordToken = function() {
+  const resetToken = crypto.randomBytes(20).toString('hex');
+  this.resetPasswordToken = crypto
     .createHash('sha256')
     .update(resetToken)
     .digest('hex');
-
-  this.passwordResetExpires = Date.now() + 10 * 60 * 1000; // 10 minutes
-
+  this.resetPasswordExpire = Date.now() + 30 * 60 * 1000; // 30 minutes
   return resetToken;
 };
 
-// Generate mobile OTP
-userSchema.methods.createMobileOTP = function() {
-  const otp = Math.floor(100000 + Math.random() * 900000).toString();
-  this.mobileVerificationCode = crypto
+User.prototype.getVerifyEmailToken = function() {
+  const verifyToken = crypto.randomBytes(20).toString('hex');
+  this.verifyEmailToken = crypto
     .createHash('sha256')
-    .update(otp)
+    .update(verifyToken)
     .digest('hex');
+  this.verifyEmailExpire = Date.now() + 24 * 60 * 60 * 1000; // 24 hours
+  return verifyToken;
+};
 
-  this.mobileVerificationExpires = Date.now() + 5 * 60 * 1000; // 5 minutes
-
+User.prototype.generateOtp = function() {
+  const otp = Math.floor(100000 + Math.random() * 900000).toString();
+  this.otp = otp;
+  this.otpExpire = Date.now() + 10 * 60 * 1000; // 10 minutes
+  this.otpAttempts = 0;
+  this.lastOtpSent = Date.now();
   return otp;
 };
 
-// Compare password method
-userSchema.methods.comparePassword = async function(candidatePassword) {
-  return await bcrypt.compare(candidatePassword, this.password);
-};
-
-// Check if password reset token is valid
-userSchema.methods.isPasswordResetTokenValid = function(token) {
+User.prototype.isPasswordResetTokenValid = function(token) {
   const hashedToken = crypto
     .createHash('sha256')
     .update(token)
     .digest('hex');
 
-  return hashedToken === this.passwordResetToken && this.passwordResetExpires > Date.now();
+  return hashedToken === this.resetPasswordToken && this.resetPasswordExpire > Date.now();
 };
 
 // Check if email verification token is valid
