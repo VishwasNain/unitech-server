@@ -17,31 +17,35 @@ const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
 // Import models
-const User = require('./models/User');
-const Product = require('./models/Product');
-const Order = require('./models/Order');
-const OrderItem = require('./models/OrderItem');
-const Address = require('./models/Address');
+const fs = require('fs');
+const path = require('path');
+const { DataTypes } = require('sequelize');
 
-// Initialize models with sequelize instance and DataTypes
 const db = {};
-const models = {
-  User: User(sequelize, require('sequelize').DataTypes),
-  Product: Product(sequelize, require('sequelize').DataTypes),
-  Order: Order(sequelize, require('sequelize').DataTypes),
-  OrderItem: OrderItem(sequelize, require('sequelize').DataTypes),
-  Address: Address(sequelize, require('sequelize').DataTypes)
-};
+const modelsDir = path.join(__dirname, 'models');
 
-// Set up model associations
-Object.keys(models).forEach(modelName => {
-  if (models[modelName].associate) {
-    models[modelName].associate(models);
-  }
+// Read all model files
+const modelFiles = fs.readdirSync(modelsDir)
+  .filter(file => {
+    return (
+      file.indexOf('.') !== 0 &&
+      file !== path.basename(__filename) &&
+      file.slice(-3) === '.js'
+    );
+  });
+
+// Initialize each model
+modelFiles.forEach(file => {
+  const model = require(path.join(modelsDir, file))(sequelize, DataTypes);
+  db[model.name] = model;
 });
 
-// Add models to db object
-Object.assign(db, models);
+// Set up model associations
+Object.keys(db).forEach(modelName => {
+  if (db[modelName] && typeof db[modelName].associate === 'function') {
+    db[modelName].associate(db);
+  }
+});
 
 // Initialize express app
 const app = express();
