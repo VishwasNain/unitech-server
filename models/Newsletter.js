@@ -1,157 +1,186 @@
-const mongoose = require('mongoose');
+const crypto = require('crypto');
 
-const newsletterSchema = new mongoose.Schema({
-  email: {
-    type: String,
-    required: [true, 'Email is required'],
-    unique: true,
-    lowercase: true,
-    match: [
-      /^\w+([.-]?\w+)*@\w+([.-]?\w+)*(\.\w{2,3})+$/,
-      'Please provide a valid email'
-    ]
-  },
-  name: {
-    type: String,
-    trim: true,
-    maxlength: [50, 'Name cannot be more than 50 characters']
-  },
-  isActive: {
-    type: Boolean,
-    default: true
-  },
-  preferences: {
-    productUpdates: {
-      type: Boolean,
-      default: true
+module.exports = (sequelize, DataTypes) => {
+  const Newsletter = sequelize.define('Newsletter', {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+      allowNull: false
     },
-    promotions: {
-      type: Boolean,
-      default: true
-    },
-    newsletters: {
-      type: Boolean,
-      default: true
-    },
-    newArrivals: {
-      type: Boolean,
-      default: true
-    }
-  },
-  subscriptionSource: {
-    type: String,
-    enum: ['website', 'popup', 'checkout', 'footer', 'other'],
-    default: 'website'
-  },
-  unsubscribeToken: {
-    type: String,
-    unique: true
-  },
-  subscribedAt: {
-    type: Date,
-    default: Date.now
-  },
-  unsubscribedAt: Date,
-  lastEmailSent: Date,
-  emailOpenCount: {
-    type: Number,
-    default: 0
-  },
-  emailClickCount: {
-    type: Number,
-    default: 0
-  },
-  ipAddress: String,
-  userAgent: String
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Index for better query performance
-newsletterSchema.index({ email: 1 });
-newsletterSchema.index({ isActive: 1, subscribedAt: -1 });
-newsletterSchema.index({ subscriptionSource: 1 });
-
-// Virtual for subscription duration in days
-newsletterSchema.virtual('subscriptionDuration').get(function() {
-  const endDate = this.unsubscribedAt || new Date();
-  return Math.floor((endDate - this.subscribedAt) / (1000 * 60 * 60 * 24));
-});
-
-// Static method to generate unsubscribe token
-newsletterSchema.statics.generateUnsubscribeToken = function() {
-  return require('crypto').randomBytes(32).toString('hex');
-};
-
-// Pre-save middleware to generate unsubscribe token
-newsletterSchema.pre('save', function(next) {
-  if (!this.unsubscribeToken) {
-    this.unsubscribeToken = this.constructor.generateUnsubscribeToken();
-  }
-  next();
-});
-
-// Static method to get active subscribers
-newsletterSchema.statics.getActiveSubscribers = function(limit = 1000) {
-  return this.find({ isActive: true })
-    .sort({ subscribedAt: -1 })
-    .limit(limit);
-};
-
-// Static method to get subscribers by source
-newsletterSchema.statics.getSubscribersBySource = function(source) {
-  return this.find({ subscriptionSource: source, isActive: true })
-    .sort({ subscribedAt: -1 });
-};
-
-// Static method to unsubscribe user
-newsletterSchema.statics.unsubscribe = async function(token) {
-  const subscriber = await this.findOne({ unsubscribeToken: token });
-
-  if (!subscriber) {
-    throw new Error('Invalid unsubscribe token');
-  }
-
-  subscriber.isActive = false;
-  subscriber.unsubscribedAt = new Date();
-
-  return subscriber.save();
-};
-
-// Static method to update email engagement
-newsletterSchema.statics.updateEngagement = async function(email, type) {
-  const update = {};
-
-  if (type === 'open') {
-    update.$inc = { emailOpenCount: 1 };
-    update.lastEmailSent = new Date();
-  } else if (type === 'click') {
-    update.$inc = { emailClickCount: 1 };
-    update.lastEmailSent = new Date();
-  }
-
-  return this.findOneAndUpdate({ email }, update, { new: true });
-};
-
-// Static method to get engagement statistics
-newsletterSchema.statics.getEngagementStats = async function() {
-  return this.aggregate([
-    {
-      $group: {
-        _id: null,
-        totalSubscribers: { $sum: 1 },
-        activeSubscribers: {
-          $sum: { $cond: ['$isActive', 1, 0] }
+    email: {
+      type: DataTypes.STRING,
+      allowNull: false,
+      unique: true,
+      validate: {
+        isEmail: {
+          msg: 'Please provide a valid email'
         },
-        totalOpens: { $sum: '$emailOpenCount' },
-        totalClicks: { $sum: '$emailClickCount' },
-        avgOpens: { $avg: '$emailOpenCount' },
-        avgClicks: { $avg: '$emailClickCount' }
+        notEmpty: {
+          msg: 'Email is required'
+        }
+      }
+    },
+    name: {
+      type: DataTypes.STRING(50),
+      allowNull: true,
+      validate: {
+        len: {
+          args: [0, 50],
+          msg: 'Name cannot be more than 50 characters'
+        }
+      }
+    },
+    isActive: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true
+    },
+    preferences: {
+      type: DataTypes.JSONB,
+      defaultValue: {
+        productUpdates: true,
+        promotions: true,
+        newsletters: true,
+        newArrivals: true
+      }
+    },
+    subscriptionSource: {
+      type: DataTypes.ENUM('website', 'popup', 'checkout', 'footer', 'other'),
+      defaultValue: 'website'
+    },
+    unsubscribeToken: {
+      type: DataTypes.STRING,
+      unique: true
+    },
+    subscribedAt: {
+      type: DataTypes.DATE,
+      defaultValue: DataTypes.NOW
+    },
+    unsubscribedAt: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    lastEmailSent: {
+      type: DataTypes.DATE,
+      allowNull: true
+    },
+    emailOpenCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    emailClickCount: {
+      type: DataTypes.INTEGER,
+      defaultValue: 0
+    },
+    ipAddress: {
+      type: DataTypes.STRING,
+      allowNull: true
+    },
+    userAgent: {
+      type: DataTypes.TEXT,
+      allowNull: true
+    },
+    subscriptionDuration: {
+      type: DataTypes.VIRTUAL,
+      get() {
+        const endDate = this.unsubscribedAt || new Date();
+        return Math.floor((endDate - this.subscribedAt) / (1000 * 60 * 60 * 24));
       }
     }
-  ]);
-};
+  }, {
+    tableName: 'newsletters',
+    timestamps: true,
+    indexes: [
+      { fields: ['email'] },
+      { fields: ['isActive', 'subscribedAt'], order: [['subscribedAt', 'DESC']] },
+      { fields: ['subscriptionSource'] },
+      { fields: ['unsubscribeToken'], unique: true }
+    ]
+  });
 
-module.exports = mongoose.model('Newsletter', newsletterSchema);
+  // Class Methods
+  Newsletter.associate = (models) => {
+    // Add associations here if needed
+  };
+
+  // Instance Methods
+  Newsletter.prototype.generateUnsubscribeToken = function() {
+    return crypto.randomBytes(32).toString('hex');
+  };
+
+  // Hooks
+  Newsletter.beforeCreate((newsletter) => {
+    if (!newsletter.unsubscribeToken) {
+      newsletter.unsubscribeToken = crypto.randomBytes(32).toString('hex');
+    }
+  });
+
+  // Static Methods
+  Newsletter.getActiveSubscribers = async function(limit = 1000) {
+    return this.findAll({
+      where: { isActive: true },
+      order: [['subscribedAt', 'DESC']],
+      limit: parseInt(limit)
+    });
+  };
+
+  Newsletter.getSubscribersBySource = function(source) {
+    return this.findAll({
+      where: { 
+        subscriptionSource: source,
+        isActive: true 
+      }
+    });
+  };
+
+  Newsletter.unsubscribe = async function(token) {
+    const subscriber = await this.findOne({ where: { unsubscribeToken: token } });
+    
+    if (!subscriber) {
+      throw new Error('Invalid unsubscribe token');
+    }
+    
+    return subscriber.update({
+      isActive: false,
+      unsubscribedAt: new Date()
+    });
+  };
+
+  Newsletter.updateEngagement = async function(email, type) {
+    const subscriber = await this.findOne({ where: { email } });
+    if (!subscriber) return null;
+
+    const updates = { lastEmailSent: new Date() };
+    
+    if (type === 'open') {
+      updates.emailOpenCount = subscriber.emailOpenCount + 1;
+    } else if (type === 'click') {
+      updates.emailClickCount = subscriber.emailClickCount + 1;
+    }
+    
+    return subscriber.update(updates);
+  };
+
+  Newsletter.getEngagementStats = async function() {
+    const result = await this.findAll({
+      attributes: [
+        [sequelize.fn('COUNT', sequelize.col('id')), 'totalSubscribers'],
+        [
+          sequelize.literal('COUNT(CASE WHEN "isActive" = true THEN 1 END)'),
+          'activeSubscribers'
+        ],
+        [sequelize.fn('SUM', sequelize.col('emailOpenCount')), 'totalOpens'],
+        [sequelize.fn('SUM', sequelize.col('emailClickCount')), 'totalClicks'],
+        [
+          sequelize.literal('AVG(CASE WHEN "emailOpenCount" > 0 THEN 1.0 ELSE 0.0 END) * 100'),
+          'avgOpenRate'
+        ]
+      ],
+      raw: true
+    });
+
+    return result[0] || {};
+  };
+
+  return Newsletter;
+};
