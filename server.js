@@ -16,13 +16,9 @@ const winston = require('winston');
 const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
-// Import models
-const fs = require('fs');
-const path = require('path');
-const { DataTypes } = require('sequelize');
-
 const db = {};
 const modelsDir = path.join(__dirname, 'models');
+const { DataTypes } = require('sequelize');
 
 // Read all model files
 const modelFiles = fs.readdirSync(modelsDir)
@@ -30,7 +26,8 @@ const modelFiles = fs.readdirSync(modelsDir)
     return (
       file.indexOf('.') !== 0 &&
       file !== path.basename(__filename) &&
-      file.slice(-3) === '.js'
+      file.slice(-3) === '.js' &&
+      file !== 'index.js' // Skip index.js if it exists
     );
   });
 
