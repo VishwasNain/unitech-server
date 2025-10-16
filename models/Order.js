@@ -1,238 +1,219 @@
-const mongoose = require('mongoose');
-
-const orderItemSchema = new mongoose.Schema({
-  product: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'Product',
-    required: true
-  },
-  quantity: {
-    type: Number,
-    required: true,
-    min: [1, 'Quantity must be at least 1']
-  },
-  price: {
-    type: Number,
-    required: true,
-    min: [0, 'Price cannot be negative']
-  },
-  name: String,
-  image: String
-});
-
-const shippingAddressSchema = new mongoose.Schema({
-  type: {
-    type: String,
-    enum: ['home', 'work', 'other'],
-    default: 'home'
-  },
-  street: {
-    type: String,
-    required: true
-  },
-  city: {
-    type: String,
-    required: true
-  },
-  state: {
-    type: String,
-    required: true
-  },
-  pincode: {
-    type: String,
-    required: true
-  },
-  country: {
-    type: String,
-    default: 'India'
-  }
-});
-
-const orderSchema = new mongoose.Schema({
-  user: {
-    type: mongoose.Schema.ObjectId,
-    ref: 'User',
-    required: true
-  },
-  orderNumber: {
-    type: String,
-    unique: true,
-    required: true
-  },
-  items: [orderItemSchema],
-  shippingAddress: shippingAddressSchema,
-  billingAddress: shippingAddressSchema,
-  paymentMethod: {
-    type: String,
-    enum: ['card', 'upi', 'netbanking', 'cod', 'wallet'],
-    required: true
-  },
-  paymentStatus: {
-    type: String,
-    enum: ['pending', 'completed', 'failed', 'refunded'],
-    default: 'pending'
-  },
-  paymentId: String,
-  orderStatus: {
-    type: String,
-    enum: [
-      'pending',
-      'confirmed',
-      'processing',
-      'shipped',
-      'out_for_delivery',
-      'delivered',
-      'cancelled',
-      'returned',
-      'refunded'
-    ],
-    default: 'pending'
-  },
-  subtotal: {
-    type: Number,
-    required: true,
-    min: [0, 'Subtotal cannot be negative']
-  },
-  tax: {
-    type: Number,
-    default: 0,
-    min: [0, 'Tax cannot be negative']
-  },
-  shipping: {
-    type: Number,
-    default: 0,
-    min: [0, 'Shipping cost cannot be negative']
-  },
-  discount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Discount cannot be negative']
-  },
-  total: {
-    type: Number,
-    required: true,
-    min: [0, 'Total cannot be negative']
-  },
-  coupon: {
-    code: String,
-    discount: Number,
-    discountType: String
-  },
-  trackingNumber: String,
-  estimatedDelivery: Date,
-  deliveredAt: Date,
-  notes: String,
-  stripePaymentIntentId: String,
-  isGift: {
-    type: Boolean,
-    default: false
-  },
-  giftMessage: String,
-  placedAt: {
-    type: Date,
-    default: Date.now
-  }
-}, {
-  timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Index for better query performance
-orderSchema.index({ user: 1, createdAt: -1 });
-orderSchema.index({ orderNumber: 1 });
-orderSchema.index({ orderStatus: 1 });
-orderSchema.index({ paymentStatus: 1 });
-
-// Virtual for order age in days
-orderSchema.virtual('orderAge').get(function() {
-  return Math.floor((Date.now() - this.createdAt) / (1000 * 60 * 60 * 24));
-});
-
-// Static method to generate unique order number
-orderSchema.statics.generateOrderNumber = function() {
-  const timestamp = Date.now().toString();
-  const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-  return `UT${timestamp.slice(-6)}${random}`;
-};
-
-// Pre-save middleware to generate order number if not exists
-orderSchema.pre('save', function(next) {
-  if (!this.orderNumber) {
-    this.orderNumber = this.constructor.generateOrderNumber();
-  }
-
-  // Set estimated delivery (7 days from order)
-  if (!this.estimatedDelivery) {
-    this.estimatedDelivery = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
-  }
-
-  next();
-});
-
-// Static method to get user's orders
-orderSchema.statics.getUserOrders = function(userId, limit = 10, skip = 0) {
-  return this.find({ user: userId })
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .skip(skip)
-    .populate('items.product');
-};
-
-// Static method to get orders by status
-orderSchema.statics.getOrdersByStatus = function(status, limit = 20) {
-  return this.find({ orderStatus: status })
-    .sort({ createdAt: -1 })
-    .limit(limit)
-    .populate('user', 'name email mobile');
-};
-
-// Static method to update order status
-orderSchema.statics.updateOrderStatus = async function(orderId, status, trackingNumber = null) {
-  const order = await this.findById(orderId);
-
-  if (!order) {
-    throw new Error('Order not found');
-  }
-
-  order.orderStatus = status;
-
-  if (status === 'delivered') {
-    order.deliveredAt = new Date();
-  }
-
-  if (trackingNumber) {
-    order.trackingNumber = trackingNumber;
-  }
-
-  return order.save();
-};
-
-// Static method to get order statistics
-orderSchema.statics.getOrderStats = async function(startDate, endDate) {
-  const matchStage = {};
-
-  if (startDate && endDate) {
-    matchStage.createdAt = { $gte: startDate, $lte: endDate };
-  }
-
-  return this.aggregate([
-    { $match: matchStage },
-    {
-      $group: {
-        _id: null,
-        totalOrders: { $sum: 1 },
-        totalRevenue: { $sum: '$total' },
-        averageOrderValue: { $avg: '$total' },
-        pendingOrders: {
-          $sum: { $cond: [{ $eq: ['$orderStatus', 'pending'] }, 1, 0] }
-        },
-        completedOrders: {
-          $sum: { $cond: [{ $eq: ['$orderStatus', 'delivered'] }, 1, 0] }
+module.exports = (sequelize, DataTypes) => {
+  const Order = sequelize.define('Order', {
+    id: {
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true,
+      allowNull: false
+    },
+    orderNumber: {
+      type: DataTypes.STRING,
+      unique: true,
+      allowNull: false
+    },
+    userId: {
+      type: DataTypes.UUID,
+      allowNull: false,
+      references: {
+        model: 'Users',
+        key: 'id'
+      }
+    },
+    paymentMethod: {
+      type: DataTypes.ENUM('credit_card', 'paypal', 'stripe', 'cod', 'bank_transfer'),
+      allowNull: false
+    },
+    paymentId: {
+      type: DataTypes.STRING
+    },
+    paymentStatus: {
+      type: DataTypes.STRING
+    },
+    paymentUpdateTime: {
+      type: DataTypes.STRING
+    },
+    paymentEmail: {
+      type: DataTypes.STRING
+    },
+    itemsPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0
+    },
+    taxPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0
+    },
+    shippingPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0
+    },
+    totalPrice: {
+      type: DataTypes.DECIMAL(10, 2),
+      allowNull: false,
+      defaultValue: 0.0
+    },
+    isPaid: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    paidAt: {
+      type: DataTypes.DATE
+    },
+    isDelivered: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: false
+    },
+    deliveredAt: {
+      type: DataTypes.DATE
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'processing', 'shipped', 'delivered', 'cancelled', 'refunded'),
+      defaultValue: 'pending'
+    },
+    trackingNumber: {
+      type: DataTypes.STRING
+    },
+    notes: {
+      type: DataTypes.TEXT
+    },
+    couponCode: {
+      type: DataTypes.STRING
+    },
+    discount: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0.0
+    },
+    refundStatus: {
+      type: DataTypes.ENUM('none', 'requested', 'approved', 'rejected', 'processed'),
+      defaultValue: 'none'
+    },
+    refundReason: {
+      type: DataTypes.TEXT
+    },
+    refundRequestedAt: {
+      type: DataTypes.DATE
+    },
+    refundProcessedAt: {
+      type: DataTypes.DATE
+    },
+    refundAmount: {
+      type: DataTypes.DECIMAL(10, 2),
+      defaultValue: 0.0
+    },
+    shippingAddressId: {
+      type: DataTypes.UUID,
+      references: {
+        model: 'Addresses',
+        key: 'id'
+      }
+    }
+  }, {
+    timestamps: true,
+    hooks: {
+      beforeCreate: async (order) => {
+        if (!order.orderNumber) {
+          order.orderNumber = 'ORD' + 
+            Date.now().toString().slice(-6) + 
+            Math.floor(1000 + Math.random() * 9000);
         }
       }
     }
-  ]);
-};
+  });
 
-module.exports = mongoose.model('Order', orderSchema);
+  // Class Methods
+  Order.associate = (models) => {
+    Order.belongsTo(models.User, {
+      foreignKey: 'userId',
+      as: 'user'
+    });
+    
+    Order.belongsTo(models.Address, {
+      foreignKey: 'shippingAddressId',
+      as: 'shippingAddress'
+    });
+    
+    Order.hasMany(models.OrderItem, {
+      foreignKey: 'orderId',
+      as: 'items'
+    });
+    
+    Order.hasMany(models.OrderStatus, {
+      foreignKey: 'orderId',
+      as: 'statusHistory'
+    });
+  };
+
+  // Instance Methods
+  Order.prototype.getUserOrders = async function(userId, limit = 10, offset = 0) {
+    return Order.findAll({
+      where: { userId },
+      order: [['createdAt', 'DESC']],
+      limit,
+      offset,
+      include: [
+        { model: this.sequelize.models.User, attributes: ['id', 'name', 'email'] },
+        { 
+          model: this.sequelize.models.OrderItem, 
+          as: 'items',
+          include: [
+            { 
+              model: this.sequelize.models.Product, 
+              attributes: ['id', 'name', 'price', 'image'] 
+            }
+          ]
+        }
+      ]
+    });
+  };
+
+  Order.getOrdersByStatus = async function(status, limit = 20) {
+    return this.findAll({
+      where: { status },
+      order: [['createdAt', 'DESC']],
+      limit,
+      include: [
+        { model: this.sequelize.models.User, attributes: ['id', 'name', 'email'] }
+      ]
+    });
+  };
+
+  Order.updateOrderStatus = async function(orderId, status, trackingNumber = null) {
+    const order = await this.findByPk(orderId);
+    
+    if (!order) {
+      throw new Error('Order not found');
+    }
+    
+    const updates = { status };
+    
+    if (status === 'delivered') {
+      updates.isDelivered = true;
+      updates.deliveredAt = new Date();
+    }
+    
+    if (trackingNumber) {
+      updates.trackingNumber = trackingNumber;
+    }
+    
+    await order.update(updates);
+    
+    // Create status history record
+    await this.sequelize.models.OrderStatus.create({
+      orderId: order.id,
+      status,
+      notes: `Status changed to ${status}`
+    });
+    
+    return order.reload({
+      include: [
+        { model: this.sequelize.models.User, attributes: ['id', 'name', 'email'] },
+        { model: this.sequelize.models.OrderItem, as: 'items' }
+      ]
+    });
+  };
+
+  return Order;
+};

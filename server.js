@@ -16,11 +16,19 @@ const winston = require('winston');
 const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
-// Import and initialize models with Sequelize instance
-const { User, Address, Wishlist } = require('./models/User')(sequelize, require('sequelize').DataTypes);
+// Import models
+const User = require('./models/User')(sequelize, require('sequelize').DataTypes);
 const Product = require('./models/Product')(sequelize, require('sequelize').DataTypes);
 const Order = require('./models/Order')(sequelize, require('sequelize').DataTypes);
 const OrderItem = require('./models/OrderItem')(sequelize, require('sequelize').DataTypes);
+const Address = require('./models/Address')(sequelize, require('sequelize').DataTypes);
+
+// Set up model associations
+if (typeof User.associate === 'function') User.associate({ User, Product, Order, OrderItem, Address });
+if (typeof Product.associate === 'function') Product.associate({ User, Product, Order, OrderItem, Address });
+if (typeof Order.associate === 'function') Order.associate({ User, Product, Order, OrderItem, Address });
+if (typeof OrderItem.associate === 'function') OrderItem.associate({ User, Product, Order, OrderItem, Address });
+if (typeof Address.associate === 'function') Address.associate({ User, Product, Order, OrderItem, Address });
 
 // Initialize express app
 const app = express();
