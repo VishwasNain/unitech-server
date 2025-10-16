@@ -1,10 +1,9 @@
-const { DataTypes } = require('sequelize');
-const { sequelize } = require('../config/database');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+module.exports = (sequelize, DataTypes) => {
+  const bcrypt = require('bcryptjs');
+  const jwt = require('jsonwebtoken');
+  const crypto = require('crypto');
 
-const User = sequelize.define('User', {
+  const User = sequelize.define('User', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
@@ -186,4 +185,4 @@ User.prototype.incrementOtpAttempts = async function() {
 };
 
 // Export the model
-module.exports = User;
+module.exports = User;}

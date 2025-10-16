@@ -17,18 +17,31 @@ const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
 // Import models
-const User = require('./models/User')(sequelize, require('sequelize').DataTypes);
-const Product = require('./models/Product')(sequelize, require('sequelize').DataTypes);
-const Order = require('./models/Order')(sequelize, require('sequelize').DataTypes);
-const OrderItem = require('./models/OrderItem')(sequelize, require('sequelize').DataTypes);
-const Address = require('./models/Address')(sequelize, require('sequelize').DataTypes);
+const User = require('./models/User');
+const Product = require('./models/Product');
+const Order = require('./models/Order');
+const OrderItem = require('./models/OrderItem');
+const Address = require('./models/Address');
+
+// Initialize models with sequelize instance and DataTypes
+const db = {};
+const models = {
+  User: User(sequelize, require('sequelize').DataTypes),
+  Product: Product(sequelize, require('sequelize').DataTypes),
+  Order: Order(sequelize, require('sequelize').DataTypes),
+  OrderItem: OrderItem(sequelize, require('sequelize').DataTypes),
+  Address: Address(sequelize, require('sequelize').DataTypes)
+};
 
 // Set up model associations
-if (typeof User.associate === 'function') User.associate({ User, Product, Order, OrderItem, Address });
-if (typeof Product.associate === 'function') Product.associate({ User, Product, Order, OrderItem, Address });
-if (typeof Order.associate === 'function') Order.associate({ User, Product, Order, OrderItem, Address });
-if (typeof OrderItem.associate === 'function') OrderItem.associate({ User, Product, Order, OrderItem, Address });
-if (typeof Address.associate === 'function') Address.associate({ User, Product, Order, OrderItem, Address });
+Object.keys(models).forEach(modelName => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
+});
+
+// Add models to db object
+Object.assign(db, models);
 
 // Initialize express app
 const app = express();
