@@ -1,204 +1,287 @@
-const mongoose = require('mongoose');
+const { DataTypes, Op } = require('sequelize');
+const sequelize = require('../config/database');
 
-const productSchema = new mongoose.Schema({
+const Product = sequelize.define('Product', {
+  id: {
+    type: DataTypes.INTEGER,
+    primaryKey: true,
+    autoIncrement: true
+  },
   name: {
-    type: String,
-    required: [true, 'Product name is required'],
-    trim: true,
-    maxlength: [100, 'Product name cannot be more than 100 characters']
+    type: DataTypes.STRING(100),
+    allowNull: false,
+    validate: {
+      notEmpty: {
+        msg: 'Product name is required'
+      },
+      len: {
+        args: [1, 100],
+        msg: 'Product name must be between 1 and 100 characters'
+      }
+    }
   },
   description: {
-    type: String,
-    required: [true, 'Product description is required'],
-    maxlength: [1000, 'Description cannot be more than 1000 characters']
+    type: DataTypes.TEXT,
+    allowNull: false,
+    validate: {
+      notEmpty: {
+        msg: 'Product description is required'
+      },
+      len: {
+        args: [1, 1000],
+        msg: 'Description cannot be more than 1000 characters'
+      }
+    }
   },
   price: {
-    type: Number,
-    required: [true, 'Price is required'],
-    min: [0, 'Price cannot be negative']
+    type: DataTypes.DECIMAL(10, 2),
+    allowNull: false,
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Price cannot be negative'
+      },
+      isDecimal: {
+        msg: 'Price must be a valid number'
+      }
+    }
   },
   originalPrice: {
-    type: Number,
-    min: [0, 'Original price cannot be negative']
+    type: DataTypes.DECIMAL(10, 2),
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Original price cannot be negative'
+      }
+    }
   },
   discount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Discount cannot be negative'],
-    max: [100, 'Discount cannot be more than 100%']
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Discount cannot be negative'
+      },
+      max: {
+        args: [100],
+        msg: 'Discount cannot be more than 100%'
+      }
+    }
   },
   category: {
-    type: String,
-    required: [true, 'Category is required'],
-    enum: {
-      values: [
-        'laptops',
-        'desktops',
-        'components',
-        'accessories',
-        'monitors',
-        'storage',
-        'networking',
-        'software',
-        'gaming',
-        'other'
-      ],
-      message: 'Please select a valid category'
+    type: DataTypes.ENUM(
+      'laptops',
+      'desktops',
+      'components',
+      'accessories',
+      'monitors',
+      'storage',
+      'networking',
+      'software',
+      'gaming',
+      'other'
+    ),
+    allowNull: false,
+    validate: {
+      notEmpty: {
+        msg: 'Category is required'
+      },
+      isIn: {
+        args: [[
+          'laptops',
+          'desktops',
+          'components',
+          'accessories',
+          'monitors',
+          'storage',
+          'networking',
+          'software',
+          'gaming',
+          'other'
+        ]],
+        msg: 'Please select a valid category'
+      }
     }
   },
   brand: {
-    type: String,
-    required: [true, 'Brand is required'],
-    trim: true
-  },
-  model: {
-    type: String,
-    trim: true
-  },
-  images: [{
-    url: {
-      type: String,
-      required: true
-    },
-    alt: {
-      type: String,
-      default: ''
-    },
-    isPrimary: {
-      type: Boolean,
-      default: false
+    type: DataTypes.STRING,
+    allowNull: false,
+    validate: {
+      notEmpty: {
+        msg: 'Brand is required'
+      }
     }
-  }],
-  specifications: {
-    type: Map,
-    of: String,
-    default: new Map()
   },
-  features: [{
-    type: String,
-    trim: true
-  }],
   stock: {
-    type: Number,
-    required: [true, 'Stock quantity is required'],
-    min: [0, 'Stock cannot be negative'],
-    default: 0
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Stock cannot be negative'
+      },
+      isInt: {
+        msg: 'Stock must be an integer'
+      }
+    }
+  },
+  featured: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   sku: {
-    type: String,
+    type: DataTypes.STRING,
     unique: true,
-    required: true,
-    uppercase: true
+    allowNull: true
   },
-  weight: {
-    type: Number,
-    min: [0, 'Weight cannot be negative']
+  slug: {
+    type: DataTypes.STRING,
+    unique: true,
+    allowNull: true
   },
-  dimensions: {
-    length: Number,
-    width: Number,
-    height: Number
+  warranty: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0,
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Warranty cannot be negative'
+      }
+    }
   },
-  tags: [{
-    type: String,
-    trim: true,
-    lowercase: true
-  }],
   isActive: {
-    type: Boolean,
-    default: true
+    type: DataTypes.BOOLEAN,
+    defaultValue: true
   },
-  isFeatured: {
-    type: Boolean,
-    default: false
+  metaTitle: {
+    type: DataTypes.STRING
+  },
+  metaDescription: {
+    type: DataTypes.TEXT
+  },
+  metaKeywords: {
+    type: DataTypes.ARRAY(DataTypes.STRING),
+    defaultValue: []
   },
   averageRating: {
-    type: Number,
-    default: 0,
-    min: [0, 'Rating cannot be negative'],
-    max: [5, 'Rating cannot be more than 5']
+    type: DataTypes.FLOAT,
+    defaultValue: 0,
+    validate: {
+      min: {
+        args: [0],
+        msg: 'Rating cannot be less than 0'
+      },
+      max: {
+        args: [5],
+        msg: 'Rating cannot be more than 5'
+      }
+    }
   },
-  reviewCount: {
-    type: Number,
-    default: 0,
-    min: [0, 'Review count cannot be negative']
-  },
-  seoTitle: {
-    type: String,
-    trim: true,
-    maxlength: [60, 'SEO title cannot be more than 60 characters']
-  },
-  seoDescription: {
-    type: String,
-    trim: true,
-    maxlength: [160, 'SEO description cannot be more than 160 characters']
+  numReviews: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
   }
 }, {
   timestamps: true,
-  toJSON: { virtuals: true },
-  toObject: { virtuals: true }
-});
-
-// Virtual for discounted price
-productSchema.virtual('discountedPrice').get(function() {
-  if (this.discount && this.discount > 0) {
-    return this.price * (1 - this.discount / 100);
-  }
-  return this.price;
-});
-
-// Virtual for availability
-productSchema.virtual('isAvailable').get(function() {
-  return this.stock > 0 && this.isActive;
-});
-
-// Index for better query performance
-productSchema.index({ name: 'text', description: 'text' });
-productSchema.index({ category: 1, isActive: 1 });
-productSchema.index({ brand: 1 });
-productSchema.index({ price: 1 });
-productSchema.index({ averageRating: -1 });
-productSchema.index({ createdAt: -1 });
-
-// Static method to get products by category
-productSchema.statics.getByCategory = function(category, limit = 20) {
-  return this.find({ category, isActive: true })
-    .sort({ createdAt: -1 })
-    .limit(limit);
-};
-
-// Static method to get featured products
-productSchema.statics.getFeatured = function(limit = 10) {
-  return this.find({ isFeatured: true, isActive: true })
-    .sort({ averageRating: -1 })
-    .limit(limit);
-};
-
-// Static method to search products
-productSchema.statics.search = function(query, limit = 20) {
-  return this.find(
+  hooks: {
+    beforeSave: async (product, options) => {
+      // Calculate discount percentage if original price exists
+      if (product.originalPrice && product.originalPrice > product.price) {
+        product.discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
+      } else {
+        product.discount = 0;
+      }
+      
+      // Generate slug from name if not provided
+      if (product.name && !product.slug) {
+        product.slug = product.name.toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/(^-|-$)/g, '');
+      }
+    }
+  },
+  getterMethods: {
+    finalPrice() {
+      return this.originalPrice && this.originalPrice > this.price 
+        ? this.price 
+        : this.originalPrice || this.price;
+    }
+  },
+  indexes: [
     {
-      $and: [
-        { isActive: true },
+      fields: ['name', 'description'],
+      using: 'GIN',
+      operator: 'gin_trgm_ops'
+    },
+    {
+      fields: ['category', 'brand']
+    },
+    {
+      fields: ['price', 'averageRating']
+    }
+  ]
+});
+
+// Class methods
+Product.getByCategory = async function(category, limit = 20) {
+  return this.findAll({
+    where: { category, isActive: true },
+    order: [['createdAt', 'DESC']],
+    limit
+  });
+};
+
+Product.getFeatured = async function(limit = 10) {
+  return this.findAll({
+    where: { featured: true, isActive: true },
+    order: [
+      ['averageRating', 'DESC'],
+      ['createdAt', 'DESC']
+    ],
+    limit
+  });
+};
+
+Product.search = async function(query, limit = 20) {
+  return this.findAll({
+    where: {
+      isActive: true,
+      [Op.or]: [
         {
-          $or: [
-            { name: { $regex: query, $options: 'i' } },
-            { description: { $regex: query, $options: 'i' } },
-            { brand: { $regex: query, $options: 'i' } },
-            { tags: { $in: [new RegExp(query, 'i')] } }
-          ]
+          name: {
+            [Op.iLike]: `%${query}%`
+          }
+        },
+        {
+          description: {
+            [Op.iLike]: `%${query}%`
+          }
         }
       ]
-    }
-  ).limit(limit);
+    },
+    order: [['createdAt', 'DESC']],
+    limit
+  });
 };
 
-// Pre-save middleware to calculate discount percentage if original price exists
-productSchema.pre('save', function(next) {
-  if (this.originalPrice && this.originalPrice > this.price) {
-    this.discount = Math.round(((this.originalPrice - this.price) / this.originalPrice) * 100);
-  }
-  next();
-});
+// Instance methods
+Product.prototype.addRating = async function(userId, rating, comment = '') {
+  const review = await this.createReview({
+    userId,
+    rating,
+    comment
+  });
+  
+  // Update average rating and review count
+  const reviews = await this.getReviews();
+  this.averageRating = reviews.reduce((acc, r) => acc + r.rating, 0) / reviews.length;
+  this.numReviews = reviews.length;
+  await this.save();
+  
+  return review;
+};
 
-module.exports = mongoose.model('Product', productSchema);
+// Associations will be defined in a separate file or after all models are defined
+
+module.exports = Product;
