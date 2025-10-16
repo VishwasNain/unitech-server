@@ -16,11 +16,11 @@ const winston = require('winston');
 const expressStatusMonitor = require('express-status-monitor');
 const { sequelize, testConnection } = require('./config/database');
 
-// Import models
-const { User, Address, Wishlist } = require('./models/User');
-const Product = require('./models/Product');
-const Order = require('./models/Order');
-const OrderItem = require('./models/OrderItem');
+// Import and initialize models with Sequelize instance
+const { User, Address, Wishlist } = require('./models/User')(sequelize, require('sequelize').DataTypes);
+const Product = require('./models/Product')(sequelize, require('sequelize').DataTypes);
+const Order = require('./models/Order')(sequelize, require('sequelize').DataTypes);
+const OrderItem = require('./models/OrderItem')(sequelize, require('sequelize').DataTypes);
 
 // Initialize express app
 const app = express();

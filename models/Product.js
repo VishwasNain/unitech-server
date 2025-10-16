@@ -1,7 +1,7 @@
-const { DataTypes, Op } = require('sequelize');
-const sequelize = require('../config/database');
-
-const Product = sequelize.define('Product', {
+module.exports = (sequelize, DataTypes) => {
+  const { Op } = require('sequelize');
+  
+  const Product = sequelize.define('Product', {
   id: {
     type: DataTypes.INTEGER,
     primaryKey: true,
@@ -284,4 +284,5 @@ Product.prototype.addRating = async function(userId, rating, comment = '') {
 
 // Associations will be defined in a separate file or after all models are defined
 
-module.exports = Product;
+  return Product;
+};
