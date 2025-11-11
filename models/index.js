@@ -15,6 +15,12 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
     }
   },
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
+  define: {
+    timestamps: true,
+    underscored: true,
+    createdAt: 'created_at',
+    updatedAt: 'updated_at'
+  }
 });
 
 // Test the database connection
@@ -28,16 +34,37 @@ const testConnection = async () => {
   }
 };
 
-testConnection();
+// Define model loading order to prevent circular dependencies
+const modelFiles = [
+  'User.js',
+  'Product.js',
+  'Order.js',
+  'OrderItem.js',
+  'Cart.js',
+  'CartItem.js',
+  'Wishlist.js',
+  'Review.js',
+  'Newsletter.js',
+  'ShippingAddress.js'
+];
 
-// Import all model files
+// Import models in the defined order
+modelFiles.forEach(file => {
+  if (fs.existsSync(path.join(__dirname, file))) {
+    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    db[model.name] = model;
+  }
+});
+
+// Then import any remaining models that weren't in the ordered list
 fs.readdirSync(__dirname)
   .filter(file => {
     return (
       file.indexOf('.') !== 0 &&
       file !== basename &&
       file.slice(-3) === '.js' &&
-      file.indexOf('.test.js') === -1
+      file.indexOf('.test.js') === -1 &&
+      !modelFiles.includes(file) // Skip already loaded models
     );
   })
   .forEach(file => {
@@ -51,6 +78,9 @@ Object.keys(db).forEach(modelName => {
     db[modelName].associate(db);
   }
 });
+
+// Test the connection after all models are loaded
+testConnection();
 
 db.sequelize = sequelize;
 db.Sequelize = Sequelize;
