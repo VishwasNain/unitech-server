@@ -48,11 +48,37 @@ const limiter = rateLimit({
 app.use(limiter);
 
 // CORS configuration
+const allowedOrigins = [
+  'https://unitechcomputers.vercel.app',
+  'https://unitechcomputer-*.vercel.app',
+  'http://localhost:3000',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
 app.use(cors({
-  origin: process.env.CLIENT_URL || 'http://localhost:3000',
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Check if the origin is in the allowed list or matches the pattern
+    if (
+      allowedOrigins.some(allowedOrigin => 
+        origin === allowedOrigin || 
+        allowedOrigin.includes('*') && 
+        new RegExp(allowedOrigin.replace('*', '.*')).test(origin)
+      )
+    ) {
+      return callback(null, true);
+    }
+    
+    const error = new Error('Not allowed by CORS');
+    error.status = 403;
+    return callback(error);
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization']
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
 }));
 
 // Body parsing middleware
