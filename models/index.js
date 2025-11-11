@@ -34,43 +34,41 @@ const testConnection = async () => {
 // Define model loading order to avoid circular dependencies
 const modelFiles = [
   'User.js',
+  'Address.js',
   'Product.js',
-  'Order.js',
-  'OrderItem.js',
+  'Review.js',
   'Cart.js',
   'CartItem.js',
+  'Order.js',
+  'OrderItem.js',
+  'ShippingAddress.js',
   'Wishlist.js',
-  'Review.js',
-  'Newsletter.js',
-  'ShippingAddress.js'
+  'Newsletter.js'
 ];
 
-// Import models in the defined order
+// First, initialize all models without associations
 modelFiles.forEach(file => {
-  const filePath = path.join(__dirname, file);
-  if (fs.existsSync(filePath)) {
-    const model = require(filePath)(sequelize, DataTypes);
-    db[model.name] = model;
+  try {
+    const filePath = path.join(__dirname, file);
+    if (fs.existsSync(filePath)) {
+      const model = require(filePath)(sequelize, DataTypes);
+      if (model && model.name) {
+        db[model.name] = model;
+      }
+    }
+  } catch (error) {
+    console.error(`Error loading model ${file}:`, error);
   }
 });
 
-// Load any additional models not explicitly listed
-fs.readdirSync(__dirname)
-  .filter(file =>
-    file.indexOf('.') !== 0 &&
-    file !== basename &&
-    file.slice(-3) === '.js' &&
-    !modelFiles.includes(file)
-  )
-  .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, DataTypes);
-    db[model.name] = model;
-  });
-
-// Setup associations
+// Then set up associations
 Object.keys(db).forEach(modelName => {
-  if (db[modelName].associate) {
-    db[modelName].associate(db);
+  if (db[modelName] && typeof db[modelName].associate === 'function') {
+    try {
+      db[modelName].associate(db);
+    } catch (error) {
+      console.error(`Error setting up associations for ${modelName}:`, error);
+    }
   }
 });
 
