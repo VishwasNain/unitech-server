@@ -47,15 +47,18 @@ const limiter = rateLimit({
 // Apply rate limiting to all requests
 app.use(limiter);
 
-// CORS configuration
-const cors = require('cors');
-
+// CORS configuration - Make sure cors is required only once
 const allowedOrigins = [
   'https://unitechcomputer.vercel.app',
   'https://unitechcomputer-*.vercel.app',
   'http://localhost:3000',
   process.env.CLIENT_URL
 ].filter(Boolean);
+
+// Move cors require to the top if not already there
+if (!global.cors) {
+  global.cors = require('cors');
+}
 
 // Configure CORS with dynamic origin
 const corsOptions = {
@@ -88,10 +91,10 @@ const corsOptions = {
 };
 
 // Enable CORS for all routes
-app.use(cors(corsOptions));
+app.use(global.cors(corsOptions));
 
 // Handle preflight requests
-app.options('*', cors(corsOptions));
+app.options('*', global.cors(corsOptions));
 
 // Log request details for debugging
 app.use((req, res, next) => {
