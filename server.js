@@ -55,55 +55,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
-// CORS configuration with explicit origin handling
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if the origin is in the allowed list or matches the pattern
-    const allowed = allowedOrigins.some(allowedOrigin => {
-      const isAllowed = origin === allowedOrigin || 
-        (allowedOrigin.includes('*') && 
-         new RegExp(allowedOrigin.replace(/\*/g, '.*')).test(origin));
-      return isAllowed;
-    });
-    
-    if (allowed) {
-      console.log('✅ Allowed origin:', origin);
-      // Set the Access-Control-Allow-Origin header directly here
-      this._origin = origin;
-      return callback(null, origin);
-    }
-    
-    console.log('❌ Blocked origin:', origin);
-    return callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true, // This is required for cookies/sessions
-  // Handle preflight requests
-  preflightContinue: false,
-  optionsSuccessStatus: 204,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: [
-    'Content-Type', 
-    'Authorization', 
-    'Cache-Control',
-    'X-Requested-With',
-    'Accept'
-  ],
-  exposedHeaders: [
-    'Content-Length', 
-    'X-Foo', 
-    'X-Bar',
-    'Content-Range',
-    'X-Total-Count'
-  ],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 200
-};
-
-// Create a custom CORS middleware
+// Enable CORS for all routes
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
@@ -111,51 +63,57 @@ app.use((req, res, next) => {
   const isAllowed = allowedOrigins.some(allowedOrigin => {
     return origin === allowedOrigin || 
       (allowedOrigin.includes('*') && 
-       new RegExp(allowedOrigin.replace(/\*/g, '.*')).test(origin));
+       origin && 
+       new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
   });
 
-  if (isAllowed) {
-    // Set CORS headers for all responses
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      console.log('🔄 Handling preflight request for:', origin);
+  // Always allow OPTIONS requests (preflight)
+  if (req.method === 'OPTIONS') {
+    if (isAllowed) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      res.header('Access-Control-Max-Age', '86400'); // 24 hours
+      console.log(`🔄 Preflight request allowed for: ${origin}`);
       return res.status(204).end();
     }
-    
+    return res.status(403).json({ error: 'Not allowed by CORS' });
+  }
+
+  // For non-OPTIONS requests, set CORS headers if allowed
+  if (isAllowed) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Credentials', 'true');
     console.log(`✅ [${req.method}] ${req.path} - Allowed origin: ${origin}`);
-  } else if (origin) {
+    return next();
+  }
+  
+  // Block requests from non-allowed origins
+  if (origin) {
     console.log(`❌ [${req.method}] ${req.path} - Blocked origin: ${origin}`);
     return res.status(403).json({ error: 'Not allowed by CORS' });
   }
   
+  // Allow requests with no origin (like curl or server-to-server)
   next();
 });
 
-// Apply CORS for non-OPTIONS requests (fallback)
-app.use(cors(corsOptions));
-
-// Log CORS headers for debugging
+// Log request details for debugging
 app.use((req, res, next) => {
-  const originalEnd = res.end;
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.path}`, {
+    origin: req.headers.origin,
+    'user-agent': req.headers['user-agent']
+  });
   
-  // Override the end method to log headers before sending the response
-  res.end = function(chunk, encoding) {
-    console.log('Response Headers:', {
-      'Access-Control-Allow-Origin': this.getHeader('access-control-allow-origin'),
-      'Access-Control-Allow-Methods': this.getHeader('access-control-allow-methods'),
-      'Access-Control-Allow-Headers': this.getHeader('access-control-allow-headers'),
-      'Access-Control-Allow-Credentials': this.getHeader('access-control-allow-credentials'),
-      'Vary': this.getHeader('vary')
+  // Log response details when the response is sent
+  res.on('finish', () => {
+    console.log(`[${new Date().toISOString()}] ${req.method} ${req.path} -> ${res.statusCode}`, {
+      'Access-Control-Allow-Origin': res.getHeader('access-control-allow-origin'),
+      'Access-Control-Allow-Credentials': res.getHeader('access-control-allow-credentials'),
+      'Content-Type': res.getHeader('content-type')
     });
-    
-    // Call the original end method
-    return originalEnd.call(this, chunk, encoding);
-  };
+  });
   
   next();
 });
