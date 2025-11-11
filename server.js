@@ -17,6 +17,9 @@ const newsletterRoutes = require('./routes/newsletterRoutes');
 
 const app = express();
 
+// Trust first proxy (important for rate limiting behind Render/Heroku/Nginx)
+app.set('trust proxy', 1);
+
 // Security middleware
 app.use(helmet());
 
@@ -32,8 +35,16 @@ const limiter = rateLimit({
   message: { 
     success: false, 
     message: 'Too many requests from this IP, please try again later.' 
+  },
+  standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
+  legacyHeaders: false, // Disable the `X-RateLimit-*` headers
+  keyGenerator: (req) => {
+    // Use the X-Forwarded-For header if present, otherwise use the remote address
+    return req.headers['x-forwarded-for'] || req.ip;
   }
 });
+
+// Apply rate limiting to all requests
 app.use(limiter);
 
 // CORS configuration
