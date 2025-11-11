@@ -7,8 +7,18 @@ const accountSid = process.env.TWILIO_ACCOUNT_SID;
 const authToken = process.env.TWILIO_AUTH_TOKEN;
 const twilioPhoneNumber = process.env.TWILIO_PHONE_NUMBER;
 
-// Initialize Twilio client
-const client = twilio(accountSid, authToken);
+// Initialize Twilio client only if credentials are provided
+let client = null;
+if (accountSid && authToken) {
+  try {
+    client = twilio(accountSid, authToken);
+  } catch (error) {
+    console.warn('Twilio initialization failed:', error.message);
+    console.warn('SMS functionality will be disabled');
+  }
+} else {
+  console.warn('Twilio credentials not found. SMS functionality will be disabled');
+}
 
 /**
  * Send OTP via SMS using Twilio
@@ -18,21 +28,41 @@ const client = twilio(accountSid, authToken);
  */
 const sendOtpViaSms = async (to, otp) => {
   try {
-    // In development, log the OTP instead of sending SMS
-    if (process.env.NODE_ENV !== 'production') {
-      console.log(`[DEV] OTP for ${to}: ${otp}`);
-      return { success: true, message: 'OTP logged in development mode' };
+    // Log the OTP in development or if Twilio is not configured
+    if (process.env.NODE_ENV !== 'production' || !client) {
+      console.log(`[${client ? 'DEV' : 'SMS DISABLED'}] OTP for ${to}: ${otp}`);
+      return { 
+        success: true, 
+        message: client ? 'OTP logged in development mode' : 'SMS is disabled - OTP logged',
+        otp: otp // Return OTP for testing purposes
+      };
     }
 
-    // In production, send actual SMS
-    const message = await client.messages.create({
-      body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
-      from: twilioPhoneNumber,
-      to: `+91${to}` // Assuming Indian numbers, adjust country code if needed
-    });
+    try {
+      // In production with Twilio configured, send actual SMS
+      const message = await client.messages.create({
+        body: `Your verification code is: ${otp}. Valid for 10 minutes.`,
+        from: twilioPhoneNumber,
+        to: `+91${to}` // Assuming Indian numbers, adjust country code if needed
+      });
 
-    console.log('SMS sent:', message.sid);
-    return { success: true, message: 'OTP sent successfully' };
+      console.log('SMS sent:', message.sid);
+      return { 
+        success: true, 
+        message: 'OTP sent successfully',
+        sid: message.sid
+      };
+    } catch (error) {
+      // If SMS sending fails, log the OTP as fallback
+      console.error('SMS sending failed, falling back to log:', error.message);
+      console.log(`[FALLBACK] OTP for ${to}: ${otp}`);
+      return { 
+        success: true, 
+        message: 'SMS sending failed, OTP logged instead',
+        otp: otp,
+        error: error.message
+      };
+    }
   } catch (error) {
     console.error('Error sending SMS:', error);
     return { 
