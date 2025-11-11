@@ -47,7 +47,9 @@ const limiter = rateLimit({
 // Apply rate limiting to all requests
 app.use(limiter);
 
-// CORS configuration - Moved to the top of the middleware chain
+// CORS configuration
+const cors = require('cors');
+
 const allowedOrigins = [
   'https://unitechcomputer.vercel.app',
   'https://unitechcomputer-*.vercel.app',
@@ -55,46 +57,41 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
-// Enable CORS for all routes - SIMPLIFIED VERSION
-app.use((req, res, next) => {
-  const origin = req.headers.origin;
-  
-  // Check if the origin is allowed
-  const isAllowed = allowedOrigins.some(allowedOrigin => {
-    return origin === allowedOrigin || 
-      (allowedOrigin.includes('*') && 
-       origin && 
-       new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
-  });
-
-  // For all requests, set CORS headers if allowed
-  if (isAllowed && origin) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
-    res.header('Access-Control-Allow-Credentials', 'true');
-    res.header('Vary', 'Origin');
+// Configure CORS with dynamic origin
+const corsOptions = {
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
     
-    // Handle preflight requests
-    if (req.method === 'OPTIONS') {
-      res.header('Access-Control-Max-Age', '86400'); // 24 hours
-      console.log(`🔄 Preflight request allowed for: ${origin}`);
-      return res.status(204).end();
+    // Check if the origin is in the allowed list or matches the pattern
+    const isAllowed = allowedOrigins.some(allowedOrigin => {
+      return origin === allowedOrigin || 
+        (allowedOrigin.includes('*') && 
+         new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
+    });
+    
+    if (isAllowed) {
+      console.log(`✅ Allowed origin: ${origin}`);
+      return callback(null, true);
+    } else {
+      console.log(`❌ Blocked origin: ${origin}`);
+      return callback(new Error('Not allowed by CORS'));
     }
-    
-    console.log(`✅ [${req.method}] ${req.path} - Allowed origin: ${origin}`);
-    return next();
-  }
-  
-  // For requests with no origin, continue (e.g., server-to-server)
-  if (!origin) {
-    return next();
-  }
-  
-  // Block requests from non-allowed origins
-  console.log(`❌ [${req.method}] ${req.path} - Blocked origin: ${origin}`);
-  res.status(403).json({ error: 'Not allowed by CORS' });
-});
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cache-Control'],
+  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'Content-Range', 'X-Total-Count'],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 200
+};
+
+// Enable CORS for all routes
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Log request details for debugging
 app.use((req, res, next) => {
