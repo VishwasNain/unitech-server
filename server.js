@@ -47,7 +47,7 @@ const limiter = rateLimit({
 // Apply rate limiting to all requests
 app.use(limiter);
 
-// CORS configuration
+// CORS configuration - Moved to the top of the middleware chain
 const allowedOrigins = [
   'https://unitechcomputer.vercel.app',
   'https://unitechcomputer-*.vercel.app',
@@ -55,7 +55,7 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
-// Enable CORS for all routes
+// Enable CORS for all routes - SIMPLIFIED VERSION
 app.use((req, res, next) => {
   const origin = req.headers.origin;
   
@@ -67,36 +67,33 @@ app.use((req, res, next) => {
        new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
   });
 
-  // Always allow OPTIONS requests (preflight)
-  if (req.method === 'OPTIONS') {
-    if (isAllowed) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
-      res.header('Access-Control-Allow-Credentials', 'true');
+  // For all requests, set CORS headers if allowed
+  if (isAllowed && origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    res.header('Vary', 'Origin');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
       res.header('Access-Control-Max-Age', '86400'); // 24 hours
       console.log(`🔄 Preflight request allowed for: ${origin}`);
       return res.status(204).end();
     }
-    return res.status(403).json({ error: 'Not allowed by CORS' });
-  }
-
-  // For non-OPTIONS requests, set CORS headers if allowed
-  if (isAllowed) {
-    res.header('Access-Control-Allow-Origin', origin);
-    res.header('Access-Control-Allow-Credentials', 'true');
+    
     console.log(`✅ [${req.method}] ${req.path} - Allowed origin: ${origin}`);
     return next();
   }
   
-  // Block requests from non-allowed origins
-  if (origin) {
-    console.log(`❌ [${req.method}] ${req.path} - Blocked origin: ${origin}`);
-    return res.status(403).json({ error: 'Not allowed by CORS' });
+  // For requests with no origin, continue (e.g., server-to-server)
+  if (!origin) {
+    return next();
   }
   
-  // Allow requests with no origin (like curl or server-to-server)
-  next();
+  // Block requests from non-allowed origins
+  console.log(`❌ [${req.method}] ${req.path} - Blocked origin: ${origin}`);
+  res.status(403).json({ error: 'Not allowed by CORS' });
 });
 
 // Log request details for debugging
