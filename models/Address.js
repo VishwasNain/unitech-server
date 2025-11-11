@@ -1,75 +1,44 @@
 const { Model, DataTypes } = require('sequelize');
 
 module.exports = (sequelize) => {
-  class Address extends Model {
+  class ShippingAddress extends Model {
     static associate(models) {
-      Address.belongsTo(models.User, {
-        foreignKey: 'userId',
-        onDelete: 'CASCADE'
-      });
+      ShippingAddress.belongsTo(models.Order, { foreignKey: 'orderId', as: 'order' });
     }
   }
 
-  Address.init({
+  ShippingAddress.init({
     id: {
       type: DataTypes.UUID,
       defaultValue: DataTypes.UUIDV4,
       primaryKey: true
     },
     type: {
-      type: DataTypes.ENUM('home', 'work', 'other'),
+      type: DataTypes.ENUM('home', 'office', 'other'),
       defaultValue: 'home'
     },
-    street: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notEmpty: { msg: 'Street is required' }
-      }
+    street: { type: DataTypes.STRING, allowNull: false },
+    city: { type: DataTypes.STRING, allowNull: false },
+    state: { type: DataTypes.STRING, allowNull: false },
+    pincode: { type: DataTypes.STRING, allowNull: false },
+    country: { type: DataTypes.STRING, defaultValue: 'India' },
+    addressType: {
+      type: DataTypes.ENUM('billing', 'shipping'),
+      allowNull: false
     },
-    city: {
-      type: DataTypes.STRING,
+    orderId: {
+      type: DataTypes.UUID, // match Order.id
       allowNull: false,
-      validate: {
-        notEmpty: { msg: 'City is required' }
-      }
-    },
-    state: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notEmpty: { msg: 'State is required' }
-      }
-    },
-    pincode: {
-      type: DataTypes.STRING,
-      allowNull: false,
-      validate: {
-        notEmpty: { msg: 'Pincode is required' },
-        is: {
-          args: /^[1-9][0-9]{5}$/,
-          msg: 'Please provide a valid 6-digit pincode'
-        }
-      }
-    },
-    isDefault: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
-    userId: {
-      type: DataTypes.UUID,
-      allowNull: false,
-      references: {
-        model: 'users',
-        key: 'id'
-      }
+      references: { model: 'orders', key: 'id' },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     }
   }, {
     sequelize,
-    modelName: 'Address',
-    tableName: 'addresses',
+    modelName: 'ShippingAddress',
+    tableName: 'shipping_addresses',
     timestamps: true
   });
 
-  return Address;
+  return ShippingAddress;
 };
