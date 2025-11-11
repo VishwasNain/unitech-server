@@ -55,6 +55,9 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
+// Enable preflight for all routes
+app.options('*', cors());
+
 app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
@@ -62,24 +65,55 @@ app.use(cors({
     
     // Check if the origin is in the allowed list or matches the pattern
     if (
-      allowedOrigins.some(allowedOrigin => 
-        origin === allowedOrigin || 
-        allowedOrigin.includes('*') && 
-        new RegExp(allowedOrigin.replace('*', '.*')).test(origin)
-      )
+      allowedOrigins.some(allowedOrigin => {
+        const isAllowed = origin === allowedOrigin || 
+          (allowedOrigin.includes('*') && 
+           new RegExp(allowedOrigin.replace('*', '.*')).test(origin));
+        return isAllowed;
+      })
     ) {
+      console.log('Allowed origin:', origin);
       return callback(null, true);
     }
     
+    console.log('Blocked origin:', origin);
     const error = new Error('Not allowed by CORS');
     error.status = 403;
     return callback(error);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar']
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: [
+    'Content-Type', 
+    'Authorization', 
+    'Cache-Control',
+    'X-Requested-With',
+    'Accept'
+  ],
+  exposedHeaders: [
+    'Content-Length', 
+    'X-Foo', 
+    'X-Bar',
+    'Content-Range',
+    'X-Total-Count'
+  ],
+  maxAge: 86400, // 24 hours
+  preflightContinue: false,
+  optionsSuccessStatus: 204
 }));
+
+// Log CORS headers for debugging
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    console.log('CORS Headers:', {
+      'Access-Control-Allow-Origin': res.getHeader('access-control-allow-origin'),
+      'Access-Control-Allow-Methods': res.getHeader('access-control-allow-methods'),
+      'Access-Control-Allow-Headers': res.getHeader('access-control-allow-headers'),
+      'Access-Control-Allow-Credentials': res.getHeader('access-control-allow-credentials')
+    });
+  });
+  next();
+});
 
 // Body parsing middleware
 app.use(express.json({ limit: '10mb' }));
