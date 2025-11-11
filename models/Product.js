@@ -221,7 +221,8 @@ module.exports = (sequelize, DataTypes) => {
     indexes: [
       { name: 'product_price_idx', fields: ['price'] },
       { name: 'product_category_idx', fields: ['category'] },
-      { name: 'product_featured_idx', fields: ['isFeatured', 'isActive'] },
+      // Removed the problematic index that was causing the error
+      // It will be added by the migration instead
       { name: 'product_sku_idx', fields: ['sku'], unique: true }
     ]
   });
