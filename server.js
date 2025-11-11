@@ -63,17 +63,20 @@ const corsOptions = {
     
     // Check if the origin is in the allowed list or matches the pattern
     const allowed = allowedOrigins.some(allowedOrigin => {
-      return origin === allowedOrigin || 
+      const isAllowed = origin === allowedOrigin || 
         (allowedOrigin.includes('*') && 
-         new RegExp(allowedOrigin.replace('*', '.*')).test(origin));
+         new RegExp(allowedOrigin.replace(/\*/g, '.*')).test(origin));
+      return isAllowed;
     });
     
     if (allowed) {
-      console.log('Allowed origin:', origin);
-      return callback(null, origin); // Return the origin instead of true
+      console.log('✅ Allowed origin:', origin);
+      // Set the Access-Control-Allow-Origin header directly here
+      this._origin = origin;
+      return callback(null, origin);
     }
     
-    console.log('Blocked origin:', origin);
+    console.log('❌ Blocked origin:', origin);
     return callback(new Error('Not allowed by CORS'));
   },
   credentials: true, // This is required for cookies/sessions
@@ -100,38 +103,60 @@ const corsOptions = {
   optionsSuccessStatus: 200
 };
 
-// Apply CORS with credentials support
+// Create a custom CORS middleware
 app.use((req, res, next) => {
-  // Handle preflight requests
-  if (req.method === 'OPTIONS') {
-    console.log('Handling preflight request for:', req.headers.origin);
-    // Set CORS headers
-    const origin = req.headers.origin;
-    if (allowedOrigins.some(o => o.includes(origin) || new RegExp(o.replace('*', '.*')).test(origin))) {
-      res.header('Access-Control-Allow-Origin', origin);
-      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
-      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept');
-      res.header('Access-Control-Allow-Credentials', 'true');
+  const origin = req.headers.origin;
+  
+  // Check if the origin is allowed
+  const isAllowed = allowedOrigins.some(allowedOrigin => {
+    return origin === allowedOrigin || 
+      (allowedOrigin.includes('*') && 
+       new RegExp(allowedOrigin.replace(/\*/g, '.*')).test(origin));
+  });
+
+  if (isAllowed) {
+    // Set CORS headers for all responses
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      console.log('🔄 Handling preflight request for:', origin);
       return res.status(204).end();
     }
-    return res.status(403).end();
+    
+    console.log(`✅ [${req.method}] ${req.path} - Allowed origin: ${origin}`);
+  } else if (origin) {
+    console.log(`❌ [${req.method}] ${req.path} - Blocked origin: ${origin}`);
+    return res.status(403).json({ error: 'Not allowed by CORS' });
   }
+  
   next();
 });
 
-// Apply CORS for non-OPTIONS requests
+// Apply CORS for non-OPTIONS requests (fallback)
 app.use(cors(corsOptions));
 
 // Log CORS headers for debugging
 app.use((req, res, next) => {
-  res.on('finish', () => {
-    console.log('CORS Headers:', {
-      'Access-Control-Allow-Origin': res.getHeader('access-control-allow-origin'),
-      'Access-Control-Allow-Methods': res.getHeader('access-control-allow-methods'),
-      'Access-Control-Allow-Headers': res.getHeader('access-control-allow-headers'),
-      'Access-Control-Allow-Credentials': res.getHeader('access-control-allow-credentials')
+  const originalEnd = res.end;
+  
+  // Override the end method to log headers before sending the response
+  res.end = function(chunk, encoding) {
+    console.log('Response Headers:', {
+      'Access-Control-Allow-Origin': this.getHeader('access-control-allow-origin'),
+      'Access-Control-Allow-Methods': this.getHeader('access-control-allow-methods'),
+      'Access-Control-Allow-Headers': this.getHeader('access-control-allow-headers'),
+      'Access-Control-Allow-Credentials': this.getHeader('access-control-allow-credentials'),
+      'Vary': this.getHeader('vary')
     });
-  });
+    
+    // Call the original end method
+    return originalEnd.call(this, chunk, encoding);
+  };
+  
   next();
 });
 
