@@ -216,13 +216,18 @@ module.exports = (sequelize) => {
       { fields: ['unsubscribe_token'], unique: true },
       { 
         name: 'newsletters_is_active',
-        fields: ['is_active'],
-        where: { is_active: true }
+        fields: ['is_active']
       },
       {
         name: 'newsletters_preferences_newsletters',
-        fields: [sequelize.literal("(preferences->>'newsletters')::boolean")],
+        fields: [sequelize.literal("((preferences->>'newsletters')::text = 'true')")],
         where: { is_active: true }
+      },
+      {
+        name: 'idx_newsletters_preferences',
+        fields: ['preferences'],
+        using: 'gin',
+        operator: 'jsonb_path_ops'
       }
     ]
   });
