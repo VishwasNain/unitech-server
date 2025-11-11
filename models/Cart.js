@@ -245,12 +245,13 @@ module.exports = (sequelize) => {
       }
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
-        model: 'Users',
+        model: 'users',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     }
   }, {
     sequelize,
