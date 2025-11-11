@@ -42,12 +42,14 @@ module.exports = (sequelize) => {
       defaultValue: 'India'
     },
     orderId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'orders',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     },
     addressType: {
       type: DataTypes.ENUM('shipping', 'billing'),
