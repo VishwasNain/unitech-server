@@ -22,6 +22,7 @@ module.exports = (sequelize) => {
       primaryKey: true
     },
     userId: {
+      field: 'user_id',  // Explicitly set the database column name
       type: DataTypes.UUID,
       allowNull: false,
       references: {
@@ -30,6 +31,7 @@ module.exports = (sequelize) => {
       }
     },
     productId: {
+      field: 'product_id',  // Explicitly set the database column name
       type: DataTypes.UUID,
       allowNull: false,
       references: {
@@ -39,6 +41,7 @@ module.exports = (sequelize) => {
     },
     addedAt: {
       type: DataTypes.DATE,
+      field: 'added_at',  // Explicitly set the database column name
       defaultValue: DataTypes.NOW
     }
   }, {
@@ -46,10 +49,11 @@ module.exports = (sequelize) => {
     modelName: 'Wishlist',
     tableName: 'wishlists',
     timestamps: true,
+    underscored: true,  // This will handle automatic conversion between snake_case and camelCase
     indexes: [
       {
         unique: true,
-        fields: ['userId', 'productId']
+        fields: ['user_id', 'product_id'],  // Use snake_case for database column names
       }
     ]
   });
