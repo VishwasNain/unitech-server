@@ -215,8 +215,14 @@ module.exports = (sequelize) => {
       { fields: ['email'], unique: true },
       { fields: ['unsubscribe_token'], unique: true },
       { 
+        name: 'newsletters_is_active',
         fields: ['is_active'],
-        where: { is_active: true, "preferences->>'newsletters'": 'true' }
+        where: { is_active: true }
+      },
+      {
+        name: 'newsletters_preferences_newsletters',
+        fields: [sequelize.literal("(preferences->>'newsletters')::boolean")],
+        where: { is_active: true }
       }
     ]
   });
