@@ -21,9 +21,9 @@ module.exports = (sequelize) => {
 
   Review.init({
     id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
     },
     rating: {
       type: DataTypes.INTEGER,
@@ -38,20 +38,22 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'users',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     },
     productId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'products',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     }
   }, {
     sequelize,
