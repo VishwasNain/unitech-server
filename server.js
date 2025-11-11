@@ -17,7 +17,43 @@ const newsletterRoutes = require('./routes/newsletterRoutes');
 
 const app = express();
 
-// Trust first proxy (important for rate limiting behind Render/Heroku/Nginx)
+// CORS configuration - Moved to the very top
+const allowedOrigins = [
+  'https://unitechcomputer.vercel.app',
+  'https://unitechcomputer-*.vercel.app',
+  'http://localhost:3000',
+  process.env.CLIENT_URL
+].filter(Boolean);
+
+// Simple CORS middleware
+app.use((req, res, next) => {
+  const origin = req.headers.origin;
+  
+  // Check if the origin is allowed
+  const isAllowed = allowedOrigins.some(allowedOrigin => {
+    return origin === allowedOrigin || 
+      (allowedOrigin.includes('*') && 
+       origin && 
+       new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
+  });
+
+  // Set CORS headers
+  if (isAllowed && origin) {
+    res.header('Access-Control-Allow-Origin', origin);
+    res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+    res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With, Accept, Cache-Control');
+    res.header('Access-Control-Allow-Credentials', 'true');
+    
+    // Handle preflight requests
+    if (req.method === 'OPTIONS') {
+      return res.status(200).end();
+    }
+  }
+  
+  next();
+});
+
+// Trust first proxy (important for rate limiting behind proxy)
 app.set('trust proxy', 1);
 
 // Security middleware
@@ -31,11 +67,8 @@ if (process.env.NODE_ENV === 'development') {
 // Rate limiting
 const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 100, // limit each IP to 100 requests per windowMs
-  message: { 
-    success: false, 
-    message: 'Too many requests from this IP, please try again later.' 
-  },
+  max: 100, // Limit each IP to 100 requests per windowMs
+  message: 'Too many requests from this IP, please try again after 15 minutes',
   standardHeaders: true, // Return rate limit info in the `RateLimit-*` headers
   legacyHeaders: false, // Disable the `X-RateLimit-*` headers
   keyGenerator: (req) => {
@@ -46,55 +79,6 @@ const limiter = rateLimit({
 
 // Apply rate limiting to all requests
 app.use(limiter);
-
-// CORS configuration - Make sure cors is required only once
-const allowedOrigins = [
-  'https://unitechcomputer.vercel.app',
-  'https://unitechcomputer-*.vercel.app',
-  'http://localhost:3000',
-  process.env.CLIENT_URL
-].filter(Boolean);
-
-// Move cors require to the top if not already there
-if (!global.cors) {
-  global.cors = require('cors');
-}
-
-// Configure CORS with dynamic origin
-const corsOptions = {
-  origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    
-    // Check if the origin is in the allowed list or matches the pattern
-    const isAllowed = allowedOrigins.some(allowedOrigin => {
-      return origin === allowedOrigin || 
-        (allowedOrigin.includes('*') && 
-         new RegExp('^' + allowedOrigin.replace(/\*/g, '.*') + '$').test(origin));
-    });
-    
-    if (isAllowed) {
-      console.log(`✅ Allowed origin: ${origin}`);
-      return callback(null, true);
-    } else {
-      console.log(`❌ Blocked origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
-    }
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Cache-Control'],
-  exposedHeaders: ['Content-Length', 'X-Foo', 'X-Bar', 'Content-Range', 'X-Total-Count'],
-  maxAge: 86400, // 24 hours
-  preflightContinue: false,
-  optionsSuccessStatus: 200
-};
-
-// Enable CORS for all routes
-app.use(global.cors(corsOptions));
-
-// Handle preflight requests
-app.options('*', global.cors(corsOptions));
 
 // Log request details for debugging
 app.use((req, res, next) => {
