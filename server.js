@@ -49,16 +49,14 @@ app.use(limiter);
 
 // CORS configuration
 const allowedOrigins = [
-  'https://unitechcomputers.vercel.app',
+  'https://unitechcomputer.vercel.app',
   'https://unitechcomputer-*.vercel.app',
   'http://localhost:3000',
   process.env.CLIENT_URL
 ].filter(Boolean);
 
-// Enable preflight for all routes
-app.options('*', cors());
-
-app.use(cors({
+// CORS configuration with credentials support
+const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
@@ -99,8 +97,14 @@ app.use(cors({
   ],
   maxAge: 86400, // 24 hours
   preflightContinue: false,
-  optionsSuccessStatus: 204
-}));
+  optionsSuccessStatus: 200
+};
+
+// Apply CORS with credentials support
+app.use(cors(corsOptions));
+
+// Handle preflight requests
+app.options('*', cors(corsOptions));
 
 // Log CORS headers for debugging
 app.use((req, res, next) => {
