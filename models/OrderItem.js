@@ -19,9 +19,9 @@ module.exports = (sequelize) => {
 
   OrderItem.init({
     id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
     },
     quantity: {
       type: DataTypes.INTEGER,
@@ -52,20 +52,22 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     productId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'products',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     },
     orderId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'orders',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE'
     }
   }, {
     sequelize,

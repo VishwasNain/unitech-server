@@ -168,9 +168,9 @@ module.exports = (sequelize) => {
 
   Order.init({
     id: {
-      type: DataTypes.INTEGER,
-      primaryKey: true,
-      autoIncrement: true
+      type: DataTypes.UUID,
+      defaultValue: DataTypes.UUIDV4,
+      primaryKey: true
     },
     orderNumber: {
       type: DataTypes.STRING,
@@ -287,12 +287,14 @@ module.exports = (sequelize) => {
       allowNull: true
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
       references: {
         model: 'users',
         key: 'id'
-      }
+      },
+      onDelete: 'CASCADE',
+      onUpdate: 'CASCADE'
     },
     placedAt: {
       type: DataTypes.DATE,
