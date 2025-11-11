@@ -1,6 +1,6 @@
 const fs = require('fs');
 const path = require('path');
-const { Sequelize } = require('sequelize');
+const { Sequelize, DataTypes } = require('sequelize');
 const basename = path.basename(__filename);
 const db = {};
 
@@ -9,10 +9,7 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
   dialect: 'postgres',
   protocol: 'postgres',
   dialectOptions: {
-    ssl: {
-      require: true,
-      rejectUnauthorized: false
-    }
+    ssl: { require: true, rejectUnauthorized: false }
   },
   logging: process.env.NODE_ENV === 'development' ? console.log : false,
   define: {
@@ -27,14 +24,14 @@ const sequelize = new Sequelize(process.env.DATABASE_URL, {
 const testConnection = async () => {
   try {
     await sequelize.authenticate();
-    console.log('✅ Database connection has been established successfully.');
+    console.log('✅ Database connection established successfully.');
   } catch (error) {
     console.error('❌ Unable to connect to the database:', error);
     process.exit(1);
   }
 };
 
-// Define model loading order to prevent circular dependencies
+// Define model loading order to avoid circular dependencies
 const modelFiles = [
   'User.js',
   'Product.js',
@@ -50,36 +47,35 @@ const modelFiles = [
 
 // Import models in the defined order
 modelFiles.forEach(file => {
-  if (fs.existsSync(path.join(__dirname, file))) {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+  const filePath = path.join(__dirname, file);
+  if (fs.existsSync(filePath)) {
+    const model = require(filePath)(sequelize, DataTypes);
     db[model.name] = model;
   }
 });
 
-// Then import any remaining models that weren't in the ordered list
+// Load any additional models not explicitly listed
 fs.readdirSync(__dirname)
-  .filter(file => {
-    return (
-      file.indexOf('.') !== 0 &&
-      file !== basename &&
-      file.slice(-3) === '.js' &&
-      file.indexOf('.test.js') === -1 &&
-      !modelFiles.includes(file) // Skip already loaded models
-    );
-  })
+  .filter(file =>
+    file.indexOf('.') !== 0 &&
+    file !== basename &&
+    file.slice(-3) === '.js' &&
+    !modelFiles.includes(file)
+  )
   .forEach(file => {
-    const model = require(path.join(__dirname, file))(sequelize, Sequelize.DataTypes);
+    const model = require(path.join(__dirname, file))(sequelize, DataTypes);
     db[model.name] = model;
   });
 
-// Set up model associations if they exist
+// Setup associations
 Object.keys(db).forEach(modelName => {
   if (db[modelName].associate) {
     db[modelName].associate(db);
   }
 });
 
-// Test the connection after all models are loaded
+console.log('✅ Loaded models:', Object.keys(db));
+
 testConnection();
 
 db.sequelize = sequelize;

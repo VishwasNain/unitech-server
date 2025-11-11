@@ -1,6 +1,6 @@
-const { Model, DataTypes } = require('sequelize');
+const { Model, DataTypes, Op } = require('sequelize');
 
-module.exports = (sequelize) => {
+module.exports = (sequelize, DataTypes) => {
   class Product extends Model {
     // Define associations
     static associate(models) {
@@ -48,10 +48,7 @@ module.exports = (sequelize) => {
     // Static method to get products by category
     static async getByCategory(category, limit = 20) {
       return this.findAll({
-        where: { 
-          category,
-          isActive: true 
-        },
+        where: { category, isActive: true },
         order: [
           ['ratingsAverage', 'DESC'],
           ['createdAt', 'DESC']
@@ -63,10 +60,7 @@ module.exports = (sequelize) => {
     // Static method to get featured products
     static async getFeatured(limit = 10) {
       return this.findAll({
-        where: { 
-          isFeatured: true, 
-          isActive: true 
-        },
+        where: { isFeatured: true, isActive: true },
         order: [
           ['ratingsAverage', 'DESC'],
           ['createdAt', 'DESC']
@@ -107,10 +101,7 @@ module.exports = (sequelize) => {
       allowNull: false,
       validate: {
         notEmpty: { msg: 'Product name is required' },
-        len: {
-          args: [1, 100],
-          msg: 'Product name cannot be more than 100 characters'
-        }
+        len: { args: [1, 100], msg: 'Product name cannot be more than 100 characters' }
       }
     },
     description: {
@@ -118,10 +109,7 @@ module.exports = (sequelize) => {
       allowNull: false,
       validate: {
         notEmpty: { msg: 'Product description is required' },
-        len: {
-          args: [1, 1000],
-          msg: 'Description cannot be more than 1000 characters'
-        }
+        len: { args: [1, 1000], msg: 'Description cannot be more than 1000 characters' }
       }
     },
     price: {
@@ -129,63 +117,37 @@ module.exports = (sequelize) => {
       allowNull: false,
       validate: {
         notNull: { msg: 'Price is required' },
-        min: {
-          args: [0],
-          msg: 'Price cannot be negative'
-        }
+        min: { args: [0], msg: 'Price cannot be negative' }
       }
     },
     originalPrice: {
       type: DataTypes.DECIMAL(10, 2),
       validate: {
-        min: {
-          args: [0],
-          msg: 'Original price cannot be negative'
-        }
+        min: { args: [0], msg: 'Original price cannot be negative' }
       }
     },
     discount: {
       type: DataTypes.INTEGER,
       defaultValue: 0,
       validate: {
-        min: {
-          args: [0],
-          msg: 'Discount cannot be negative'
-        },
-        max: {
-          args: [100],
-          msg: 'Discount cannot be more than 100%'
-        }
+        min: { args: [0], msg: 'Discount cannot be negative' },
+        max: { args: [100], msg: 'Discount cannot be more than 100%' }
       }
     },
     category: {
       type: DataTypes.ENUM(
-        'laptops',
-        'desktops',
-        'components',
-        'accessories',
-        'monitors',
-        'storage',
-        'networking',
-        'software',
-        'gaming',
-        'other'
+        'laptops', 'desktops', 'components', 'accessories',
+        'monitors', 'storage', 'networking', 'software',
+        'gaming', 'other'
       ),
       allowNull: false,
       validate: {
         notNull: { msg: 'Category is required' },
         isIn: {
           args: [[
-            'laptops',
-            'desktops',
-            'components',
-            'accessories',
-            'monitors',
-            'storage',
-            'networking',
-            'software',
-            'gaming',
-            'other'
+            'laptops', 'desktops', 'components', 'accessories',
+            'monitors', 'storage', 'networking', 'software',
+            'gaming', 'other'
           ]],
           msg: 'Please select a valid category'
         }
@@ -194,108 +156,52 @@ module.exports = (sequelize) => {
     brand: {
       type: DataTypes.STRING,
       allowNull: false,
-      validate: {
-        notEmpty: { msg: 'Brand is required' }
-      }
+      validate: { notEmpty: { msg: 'Brand is required' } }
     },
-    model: {
-      type: DataTypes.STRING,
-      allowNull: true
-    },
+    model: DataTypes.STRING,
     stock: {
       type: DataTypes.INTEGER,
       allowNull: false,
       defaultValue: 0,
       validate: {
         notNull: { msg: 'Stock quantity is required' },
-        min: {
-          args: [0],
-          msg: 'Stock cannot be negative'
-        }
+        min: { args: [0], msg: 'Stock cannot be negative' }
       }
     },
     sku: {
       type: DataTypes.STRING,
       unique: true,
       allowNull: false,
-      validate: {
-        notEmpty: { msg: 'SKU is required' }
-      }
+      validate: { notEmpty: { msg: 'SKU is required' } }
     },
     weight: {
       type: DataTypes.DECIMAL(10, 2),
-      allowNull: true,
-      validate: {
-        min: {
-          args: [0],
-          msg: 'Weight cannot be negative'
-        }
-      }
+      validate: { min: { args: [0], msg: 'Weight cannot be negative' } }
     },
-    dimensions: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-      defaultValue: {}
-    },
-    specifications: {
-      type: DataTypes.JSONB,
-      allowNull: true,
-      defaultValue: {}
-    },
-    features: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: true,
-      defaultValue: []
-    },
-    tags: {
-      type: DataTypes.ARRAY(DataTypes.STRING),
-      allowNull: true,
-      defaultValue: []
-    },
+    dimensions: { type: DataTypes.JSONB, defaultValue: {} },
+    specifications: { type: DataTypes.JSONB, defaultValue: {} },
+    features: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
+    tags: { type: DataTypes.ARRAY(DataTypes.STRING), defaultValue: [] },
     ratingsAverage: {
       type: DataTypes.FLOAT,
       defaultValue: 0,
       validate: {
-        min: {
-          args: [0],
-          msg: 'Rating cannot be less than 0'
-        },
-        max: {
-          args: [5],
-          msg: 'Rating cannot be more than 5'
-        }
+        min: { args: [0], msg: 'Rating cannot be less than 0' },
+        max: { args: [5], msg: 'Rating cannot be more than 5' }
       }
     },
-    ratingsCount: {
-      type: DataTypes.INTEGER,
-      defaultValue: 0
-    },
+    ratingsCount: { type: DataTypes.INTEGER, defaultValue: 0 },
     warranty: {
       type: DataTypes.INTEGER,
-      allowNull: true,
       defaultValue: 0,
-      validate: {
-        min: {
-          args: [0],
-          msg: 'Warranty cannot be negative'
-        }
-      }
+      validate: { min: { args: [0], msg: 'Warranty cannot be negative' } }
     },
-    isActive: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: true
-    },
-    isFeatured: {
-      type: DataTypes.BOOLEAN,
-      defaultValue: false
-    },
+    isActive: { type: DataTypes.BOOLEAN, defaultValue: true },
+    isFeatured: { type: DataTypes.BOOLEAN, defaultValue: false },
     sellerId: {
       type: DataTypes.UUID,
       allowNull: false,
-      references: {
-        model: 'users',
-        key: 'id'
-      },
+      references: { model: 'users', key: 'id' },
       onDelete: 'CASCADE'
     }
   }, {
@@ -305,7 +211,6 @@ module.exports = (sequelize) => {
     timestamps: true,
     hooks: {
       beforeSave: (product) => {
-        // Calculate discount before saving
         if (product.originalPrice && product.originalPrice > product.price) {
           product.discount = Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100);
         } else {
@@ -314,28 +219,10 @@ module.exports = (sequelize) => {
       }
     },
     indexes: [
-      {
-        name: 'product_search_idx',
-        fields: ['name', 'description', 'brand', 'category'],
-        type: 'FULLTEXT'
-      },
-      {
-        name: 'product_price_idx',
-        fields: ['price']
-      },
-      {
-        name: 'product_category_idx',
-        fields: ['category']
-      },
-      {
-        name: 'product_featured_idx',
-        fields: ['isFeatured', 'isActive']
-      },
-      {
-        name: 'product_sku_idx',
-        fields: ['sku'],
-        unique: true
-      }
+      { name: 'product_price_idx', fields: ['price'] },
+      { name: 'product_category_idx', fields: ['category'] },
+      { name: 'product_featured_idx', fields: ['isFeatured', 'isActive'] },
+      { name: 'product_sku_idx', fields: ['sku'], unique: true }
     ]
   });
 
