@@ -55,31 +55,31 @@ const allowedOrigins = [
   process.env.CLIENT_URL
 ].filter(Boolean);
 
-// CORS configuration with credentials support
+// CORS configuration with explicit origin handling
 const corsOptions = {
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
     
     // Check if the origin is in the allowed list or matches the pattern
-    if (
-      allowedOrigins.some(allowedOrigin => {
-        const isAllowed = origin === allowedOrigin || 
-          (allowedOrigin.includes('*') && 
-           new RegExp(allowedOrigin.replace('*', '.*')).test(origin));
-        return isAllowed;
-      })
-    ) {
+    const allowed = allowedOrigins.some(allowedOrigin => {
+      return origin === allowedOrigin || 
+        (allowedOrigin.includes('*') && 
+         new RegExp(allowedOrigin.replace('*', '.*')).test(origin));
+    });
+    
+    if (allowed) {
       console.log('Allowed origin:', origin);
-      return callback(null, true);
+      return callback(null, origin); // Return the origin instead of true
     }
     
     console.log('Blocked origin:', origin);
-    const error = new Error('Not allowed by CORS');
-    error.status = 403;
-    return callback(error);
+    return callback(new Error('Not allowed by CORS'));
   },
-  credentials: true,
+  credentials: true, // This is required for cookies/sessions
+  // Handle preflight requests
+  preflightContinue: false,
+  optionsSuccessStatus: 204,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
   allowedHeaders: [
     'Content-Type', 
@@ -101,10 +101,26 @@ const corsOptions = {
 };
 
 // Apply CORS with credentials support
-app.use(cors(corsOptions));
+app.use((req, res, next) => {
+  // Handle preflight requests
+  if (req.method === 'OPTIONS') {
+    console.log('Handling preflight request for:', req.headers.origin);
+    // Set CORS headers
+    const origin = req.headers.origin;
+    if (allowedOrigins.some(o => o.includes(origin) || new RegExp(o.replace('*', '.*')).test(origin))) {
+      res.header('Access-Control-Allow-Origin', origin);
+      res.header('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS');
+      res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, Cache-Control, X-Requested-With, Accept');
+      res.header('Access-Control-Allow-Credentials', 'true');
+      return res.status(204).end();
+    }
+    return res.status(403).end();
+  }
+  next();
+});
 
-// Handle preflight requests
-app.options('*', cors(corsOptions));
+// Apply CORS for non-OPTIONS requests
+app.use(cors(corsOptions));
 
 // Log CORS headers for debugging
 app.use((req, res, next) => {
