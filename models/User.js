@@ -82,7 +82,7 @@ module.exports = (sequelize) => {
     // Define associations
     static associate(models) {
       // Define associations here
-      User.hasMany(models.Address, { foreignKey: 'userId' });
+      User.hasMany(models.ShippingAddress, { foreignKey: 'userId' });
       User.hasMany(models.Wishlist, { foreignKey: 'userId' });
     }
   }

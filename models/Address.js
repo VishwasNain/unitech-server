@@ -3,7 +3,18 @@ const { Model, DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   class ShippingAddress extends Model {
     static associate(models) {
-      ShippingAddress.belongsTo(models.Order, { foreignKey: 'orderId', as: 'order' });
+      // ShippingAddress belongs to User
+      ShippingAddress.belongsTo(models.User, {
+        foreignKey: 'userId',
+        onDelete: 'CASCADE'
+      });
+      
+      // ShippingAddress belongs to Order (optional)
+      ShippingAddress.belongsTo(models.Order, { 
+        foreignKey: 'orderId', 
+        as: 'order',
+        onDelete: 'CASCADE'
+      });
     }
   }
 
@@ -26,12 +37,23 @@ module.exports = (sequelize) => {
       type: DataTypes.ENUM('billing', 'shipping'),
       allowNull: false
     },
-    orderId: {
-      type: DataTypes.UUID, // match Order.id
+    userId: {
+      type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'orders', key: 'id' },
-      onDelete: 'CASCADE',
-      onUpdate: 'CASCADE'
+      references: { 
+        model: 'users',
+        key: 'id' 
+      },
+      onDelete: 'CASCADE'
+    },
+    orderId: {
+      type: DataTypes.UUID,
+      allowNull: true, // Make this optional if an address can exist without an order
+      references: { 
+        model: 'orders', 
+        key: 'id' 
+      },
+      onDelete: 'CASCADE'
     }
   }, {
     sequelize,

@@ -3,9 +3,24 @@ const { Model, DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   class Order extends Model {
     static associate(models) {
-      Order.belongsTo(models.User, { foreignKey: 'userId' });
-      Order.hasMany(models.OrderItem, { foreignKey: 'orderId' });
-      Order.hasOne(models.ShippingAddress, { foreignKey: 'orderId', as: 'shippingAddress' });
+      // Order belongs to User
+      Order.belongsTo(models.User, { 
+        foreignKey: 'userId',
+        as: 'user'
+      });
+      
+      // Order has many OrderItems
+      Order.hasMany(models.OrderItem, { 
+        foreignKey: 'orderId',
+        as: 'items'
+      });
+      
+      // Order has one ShippingAddress
+      Order.hasOne(models.ShippingAddress, { 
+        foreignKey: 'orderId', 
+        as: 'shippingAddress',
+        constraints: false
+      });
     }
   }
 
@@ -16,9 +31,12 @@ module.exports = (sequelize) => {
       primaryKey: true
     },
     userId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'users', key: 'id' },
+      references: { 
+        model: 'users', 
+        key: 'id' 
+      },
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
     },

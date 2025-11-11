@@ -3,23 +3,38 @@ const { Model, DataTypes } = require('sequelize');
 module.exports = (sequelize) => {
   class OrderItem extends Model {
     static associate(models) {
-      OrderItem.belongsTo(models.Order, { foreignKey: 'orderId' });
-      OrderItem.belongsTo(models.Product, { foreignKey: 'productId' });
+      // OrderItem belongs to Order
+      OrderItem.belongsTo(models.Order, { 
+        foreignKey: 'orderId',
+        as: 'order'
+      });
+      
+      // OrderItem belongs to Product
+      OrderItem.belongsTo(models.Product, { 
+        foreignKey: 'productId',
+        as: 'product'
+      });
     }
   }
 
   OrderItem.init({
     orderId: {
-      type: DataTypes.UUID, // match Order.id type
+      type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'orders', key: 'id' },
+      references: { 
+        model: 'orders', 
+        key: 'id' 
+      },
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
     },
     productId: {
-      type: DataTypes.INTEGER,
+      type: DataTypes.UUID,
       allowNull: false,
-      references: { model: 'products', key: 'id' },
+      references: { 
+        model: 'products', 
+        key: 'id' 
+      },
       onDelete: 'CASCADE',
       onUpdate: 'CASCADE'
     },
